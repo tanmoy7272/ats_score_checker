@@ -1,6 +1,7 @@
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const rateLimit = require('express-rate-limit');
 const healthRoutes = require('./routes/healthRoutes');
 const resumeRoutes = require('./routes/resumeRoutes');
@@ -27,6 +28,14 @@ app.use('/health', healthRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/job', jobRoutes);
 app.use('/api/score', scoreRoutes);
+
+// Serve static files from the React app build directory
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// Catch all handler: send back React's index.html file for client-side routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
 
 // Centralized Error Handling
 app.use(errorHandler);

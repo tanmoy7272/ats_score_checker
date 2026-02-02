@@ -27,8 +27,9 @@ To use the AI scoring features, you need a Google Gemini API Key:
 ### 1. Environment Variables
 Create a `.env` file in the `server/` directory:
 ```env
-API_KEY=your_gemini_api_key_here
-PORT=5000
+GEMINI_API_KEY=your_gemini_api_key_here
+PORT=5001
+NODE_ENV=development
 ```
 
 ### 2. Install Dependencies
@@ -41,15 +42,14 @@ cd server
 npm install
 ```
 
-### 3. Run Development
+### 3. Run the Application
 ```bash
-# Terminal 1: Frontend (Root)
-npm run dev
-
-# Terminal 2: Backend
+# Start the server (includes frontend serving)
 cd server
 npm run dev
 ```
+
+The app will be available at `http://localhost:5001/`.
 
 ## API Endpoints
 - `GET /health`: Server health check

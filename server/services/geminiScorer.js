@@ -1,61 +1,58 @@
-
-const { GoogleGenAI, Type } = require('@google/genai');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 /**
- * Uses Gemini AI to compare resume features against job requirements.
- * Optimized for Gemini 3 Flash.
+ * Uses Gemini AI to compare resume features against job requirements
+ * Works with official @google/generative-ai SDK
  */
 async function getAIScore(resumeFeatures, jobFeatures) {
-  if (!process.env.API_KEY) {
-    throw new Error('Gemini API key is not configured on the server.');
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("Missing GEMINI_API_KEY in .env");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  const prompt = `Act as an expert ATS. Compare this resume to the JD.
-Resume: ${JSON.stringify(resumeFeatures)}
-JD: ${JSON.stringify(jobFeatures)}
-Return JSON analysis.`;
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-flash-latest" // latest flash model
+  });
+
+  const prompt = `
+You are an expert ATS recruiter.
+
+Compare this resume and job description.
+
+Return ONLY valid JSON in this exact format:
+
+{
+  "score": number (0-100),
+  "matchedSkills": [],
+  "missingSkills": [],
+  "reasons": [],
+  "improvements": []
+}
+
+Resume:
+${JSON.stringify(resumeFeatures)}
+
+Job:
+${JSON.stringify(jobFeatures)}
+`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        systemInstruction: "You are a professional hiring manager. Provide honest, critical, and constructive feedback. Only output valid JSON.",
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            score: { type: Type.NUMBER },
-            matchedSkills: { type: Type.ARRAY, items: { type: Type.STRING } },
-            missingSkills: { type: Type.ARRAY, items: { type: Type.STRING } },
-            reasons: { type: Type.ARRAY, items: { type: Type.STRING } },
-            improvements: { type: Type.ARRAY, items: { type: Type.STRING } }
-          },
-          required: ['score', 'matchedSkills', 'missingSkills', 'reasons', 'improvements']
-        }
-      }
-    });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
 
-    if (!response || !response.text) {
-      throw new Error('Received empty response from Gemini AI.');
-    }
+    // safer JSON parsing
+    const clean = text.replace(/```json|```/g, "").trim();
 
-    const result = JSON.parse(response.text);
-    return result;
+    return JSON.parse(clean);
+
   } catch (error) {
-    console.error('Gemini Scorer Error:', error.message);
-    
-    // Provide user-friendly messages for common API errors
-    if (error.message.includes('API key')) {
-      throw new Error('Invalid or expired API Key. Please check your .env file.');
-    }
-    
-    throw new Error('AI analysis failed. Please ensure your API key is correct and try again.');
+    console.error("Gemini Scorer Error:", error.message);
+    console.error("Full error:", error);
+    throw new Error(
+      "AI scoring failed. Check API key or Gemini quota."
+    );
   }
 }
 
-module.exports = {
-  getAIScore
-};
+module.exports = { getAIScore };
