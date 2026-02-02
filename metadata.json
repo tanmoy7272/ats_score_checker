@@ -1,0 +1,5 @@
+{
+  "name": "ATS Scorer Starter",
+  "description": "A production-ready full-stack starter for an Applicant Tracking System (ATS) scorer with React and Node.js.",
+  "requestFramePermissions": []
+}
