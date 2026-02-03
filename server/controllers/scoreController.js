@@ -56,7 +56,26 @@ const calculateScoreV2 = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in calculateScoreV2:', error);
-    return res.status(500).json({ error: error.message || 'Failed to calculate score V2.' });
+    
+    // Extract meaningful error message
+    let errorMessage = error.message || 'Failed to calculate score.';
+    let statusCode = 500;
+    
+    // Handle OpenAI API errors
+    if (error.status === 429) {
+      errorMessage = 'API quota exceeded. Please check your billing or wait for quota reset.';
+      statusCode = 429;
+    } else if (error.status === 401) {
+      errorMessage = 'Invalid API key. Please check your configuration.';
+      statusCode = 401;
+    } else if (error.error && error.error.message) {
+      errorMessage = error.error.message;
+    }
+    
+    return res.status(statusCode).json({ 
+      error: errorMessage,
+      details: error.message 
+    });
   }
 };
 
