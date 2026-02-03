@@ -43,3 +43,11 @@ export const scoreCandidate = async (
   const response = await axios.post(`${API_BASE_URL}/score`, { resume, job });
   return response.data;
 };
+
+export const scoreCandidateV2 = async (
+  resumeText: string,
+  jobText: string
+): Promise<any> => {
+  const response = await axios.post(`${API_BASE_URL}/score/v2`, { resumeText, jobText });
+  return response.data;
+};

@@ -1,5 +1,8 @@
 
 const { getAIScore } = require('../services/geminiScorer');
+const { extractStructuredFeatures } = require('../services/geminiExtractor');
+const { computeScore } = require('../services/scoreEngine');
+const { explain } = require('../services/geminiExplainer');
 
 const calculateScore = async (req, res) => {
   try {
@@ -23,6 +26,41 @@ const calculateScore = async (req, res) => {
   }
 };
 
+const calculateScoreV2 = async (req, res) => {
+  try {
+    const { resumeText, jobText } = req.body;
+
+    if (!resumeText || !jobText) {
+      return res.status(400).json({ error: 'Both resumeText and jobText are required.' });
+    }
+
+    // 1. extract resume features
+    const resumeFeatures = await extractStructuredFeatures(resumeText);
+
+    // 2. extract job features
+    const jobFeatures = await extractStructuredFeatures(jobText);
+
+    // 3. compute deterministic score
+    const { finalScore: score, breakdown } = computeScore(resumeFeatures, jobFeatures);
+
+    // 4. generate explanation
+    const explanation = await explain({ score, breakdown, resumeFeatures, jobFeatures });
+
+    return res.status(200).json({
+      score,
+      breakdown,
+      resumeFeatures,
+      jobFeatures,
+      reasons: explanation.reasons || [],
+      improvements: explanation.improvements || []
+    });
+  } catch (error) {
+    console.error('Error in calculateScoreV2:', error);
+    return res.status(500).json({ error: error.message || 'Failed to calculate score V2.' });
+  }
+};
+
 module.exports = {
-  calculateScore
+  calculateScore,
+  calculateScoreV2
 };

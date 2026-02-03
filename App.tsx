@@ -1,14 +1,16 @@
 
 import React, { useState } from 'react';
-import { uploadResume, analyzeJob, scoreCandidate } from './services/api';
-import { ScoreResult } from './types';
+import { uploadResume, scoreCandidateV2 } from './services/api';
+import ScoreSummary from './client/src/components/ScoreSummary';
+import ParameterChecklist from './client/src/components/ParameterChecklist';
+import { ScoreV2Response } from './types';
 
 const App: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ScoreResult | null>(null);
+  const [result, setResult] = useState<ScoreV2Response | null>(null);
 
   const handleAnalyze = async () => {
     if (!file || !jobDescription.trim()) {
@@ -22,12 +24,12 @@ const App: React.FC = () => {
 
     try {
       const resumeResponse = await uploadResume(file);
-      const jobResponse = await analyzeJob(jobDescription);
-      const scoreResponse = await scoreCandidate(
-        resumeResponse.features, 
-        jobResponse.job
-      );
-      setResult(scoreResponse.result);
+      const resumeText = resumeResponse.parsed?.fullText || '';
+
+      const scoreResponse = await scoreCandidateV2(resumeText, jobDescription);
+
+      // Normalize into expected result shape for UI
+      setResult(scoreResponse);
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Processing failed.');
     } finally {
@@ -38,6 +40,12 @@ const App: React.FC = () => {
   const scoreColor = (s: number) => {
     if (s >= 75) return 'text-emerald-500';
     if (s >= 50) return 'text-amber-500';
+    return 'text-rose-500';
+  };
+
+  const paramColor = (v: 0|0.5|1) => {
+    if (v === 1) return 'text-emerald-600';
+    if (v === 0.5) return 'text-amber-500';
     return 'text-rose-500';
   };
 
@@ -124,43 +132,39 @@ const App: React.FC = () => {
 
             {result && (
               <div className="space-y-6 animate-in slide-in-from-right-8 duration-500">
-                <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 text-center">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Compatibility Score</span>
-                  <div className={`text-7xl font-black mt-2 ${scoreColor(result.score)}`}>{result.score}%</div>
-                  <div className="mt-6 flex flex-wrap justify-center gap-2">
-                    {result.matchedSkills.map(s => <span key={s} className="px-2 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase rounded border border-emerald-100">{s}</span>)}
-                  </div>
+                <ScoreSummary score={result.score} breakdown={result.breakdown} />
+                
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                  <h2 className="text-lg font-bold text-slate-900 mb-4">Parameter Matching</h2>
+                  <ParameterChecklist breakdown={result.breakdown} resume={result.resumeFeatures} job={result.jobFeatures} />
                 </div>
 
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                  <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Gap Analysis</h3>
+                  <h2 className="text-lg font-bold text-slate-900 mb-4">AI Insights</h2>
                   <div className="space-y-4">
                     <div>
-                      <p className="text-[10px] font-bold text-rose-500 uppercase mb-2">Missing Skills</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {result.missingSkills.length ? result.missingSkills.map(s => <span key={s} className="px-2 py-0.5 bg-rose-50 text-rose-600 text-[11px] font-medium rounded-md border border-rose-100">{s}</span>) : <span className="text-slate-400 text-xs italic">All key skills matched!</span>}
-                      </div>
+                      <h3 className="text-sm font-semibold text-slate-700 mb-2">Why This Score?</h3>
+                      <ul className="space-y-2">
+                        {(result.reasons || []).map((r, i) => (
+                          <li key={i} className="text-sm text-slate-600 flex items-start gap-2">
+                            <span className="text-indigo-600 mt-0.5">•</span>
+                            <span>{r}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-indigo-500 uppercase mb-2">Key Observations</p>
+                      <h3 className="text-sm font-semibold text-slate-700 mb-2">How to Improve</h3>
                       <ul className="space-y-2">
-                        {result.reasons.map((r, i) => <li key={i} className="text-xs text-slate-600 leading-relaxed flex items-start gap-2"><span className="text-indigo-400 mt-0.5">•</span> {r}</li>)}
+                        {(result.improvements || []).map((imp, i) => (
+                          <li key={i} className="text-sm text-slate-600 flex items-start gap-2">
+                            <span className="text-emerald-600 mt-0.5">→</span>
+                            <span>{imp}</span>
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   </div>
-                </div>
-
-                <div className="bg-indigo-900 text-white rounded-2xl p-6 shadow-xl shadow-indigo-100">
-                  <h3 className="text-sm font-bold border-b border-white/20 pb-2 mb-4 flex items-center gap-2">
-                    <span className="text-amber-400">✨</span> Recommendations
-                  </h3>
-                  <ul className="space-y-3">
-                    {result.improvements.map((tip, i) => (
-                      <li key={i} className="text-xs text-indigo-100 leading-relaxed bg-white/5 p-2 rounded-lg border border-white/5">
-                        {tip}
-                      </li>
-                    ))}
-                  </ul>
                 </div>
               </div>
             )}
