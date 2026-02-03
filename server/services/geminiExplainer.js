@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { AIClient } = require('./aiClient');
 
 const PROMPT = `You are an explainer. Given a deterministic score, the breakdown, resume features and job features, produce JSON only with:
 {
@@ -9,26 +9,20 @@ const PROMPT = `You are an explainer. Given a deterministic score, the breakdown
 Do not compute the score or change numbers. Provide concise human-readable reasons and actionable improvements.`;
 
 async function explain({ score, breakdown, resumeFeatures, jobFeatures }) {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error('Missing GEMINI_API_KEY in environment');
-  }
-
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-flash-latest' });
-
-  const prompt = `${PROMPT}\n\nInput:\n${JSON.stringify({ score, breakdown, resumeFeatures, jobFeatures })}`;
-
-  const result = await model.generateContent(prompt);
-  const txt = result.response.text();
-  const clean = txt.replace(/```json|```/g, '').trim();
-
   try {
+    const aiClient = new AIClient();
+    const prompt = `${PROMPT}\n\nInput:\n${JSON.stringify({ score, breakdown, resumeFeatures, jobFeatures })}`;
+
+    const txt = await aiClient.generateContent(prompt);
+    const clean = txt.replace(/```json|```/g, '').trim();
+
     const parsed = JSON.parse(clean);
     return {
       reasons: Array.isArray(parsed.reasons) ? parsed.reasons : [],
       improvements: Array.isArray(parsed.improvements) ? parsed.improvements : []
     };
   } catch (err) {
+    console.error('Explanation generation error:', err.message);
     return { reasons: [], improvements: [] };
   }
 }

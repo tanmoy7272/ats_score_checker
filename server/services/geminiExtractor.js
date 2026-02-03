@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { AIClient } = require('./aiClient');
 
 const PROMPT = `You are an extractor. Given a resume or job description, return JSON only that matches this schema exactly:
 {
@@ -32,20 +32,12 @@ async function extractStructuredFeatures(text) {
     };
   }
 
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error('Missing GEMINI_API_KEY in environment');
-  }
-
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-flash-latest' });
-
-  const prompt = `${PROMPT}\n\nText:\n${text}`;
-
-  const result = await model.generateContent(prompt);
-  const txt = result.response.text();
-  const clean = txt.replace(/```json|```/g, '').trim();
-
   try {
+    const aiClient = new AIClient();
+    const prompt = `${PROMPT}\n\nText:\n${text}`;
+    const txt = await aiClient.generateContent(prompt);
+    const clean = txt.replace(/```json|```/g, '').trim();
+
     const parsed = JSON.parse(clean);
     return {
       skills: parsed.skills || [],
@@ -60,6 +52,7 @@ async function extractStructuredFeatures(text) {
       keywords: parsed.keywords || []
     };
   } catch (err) {
+    console.error('Feature extraction error:', err.message);
     return {
       skills: [],
       tools: [],
