@@ -18,8 +18,16 @@ const limiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' }
 });
 
+// CORS configuration for production
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? [process.env.FRONTEND_URL, /\.vercel\.app$/, /\.railway\.app$/]
+    : '*',
+  credentials: true
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/api/', limiter);
 
