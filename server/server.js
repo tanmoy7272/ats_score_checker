@@ -1,16 +1,23 @@
-
 require('dotenv').config();
 const app = require('./app');
 
 // Validate Environment Variables - check for at least one API key
-const hasGemini = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'sk-your-openai-key-here';
-const hasOpenAI = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'sk-your-openai-key-here';
+const hasGemini = process.env.GEMINI_API_KEY && 
+                  process.env.GEMINI_API_KEY !== 'sk-your-openai-key-here' &&
+                  process.env.GEMINI_API_KEY.trim() !== '';
+
+const hasOpenAI = process.env.OPENAI_API_KEY && 
+                  process.env.OPENAI_API_KEY !== 'sk-your-openai-key-here' &&
+                  process.env.OPENAI_API_KEY.trim() !== '';
 
 if (!hasGemini && !hasOpenAI) {
   console.error('FATAL ERROR: No valid API keys found.');
   console.error('Please provide at least one of:');
   console.error('  - GEMINI_API_KEY (get from https://aistudio.google.com/)');
   console.error('  - OPENAI_API_KEY (get from https://platform.openai.com/)');
+  console.error('\nCurrent environment variables:');
+  console.error('  GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? 'Set (hidden)' : 'Not set');
+  console.error('  OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Set (hidden)' : 'Not set');
   process.exit(1);
 }
 
@@ -22,9 +29,11 @@ if (hasGemini && hasOpenAI) {
   console.log('🔑 Using OpenAI API only');
 }
 
+// Railway uses PORT environment variable
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📡 API key detected. AI features enabled.`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📡 AI features enabled`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
