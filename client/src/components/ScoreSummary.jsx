@@ -15,11 +15,13 @@ const ScoreCircle = ({ score }) => {
 };
 
 const ScoreSummary = ({ score, breakdown }) => {
-  const matchedCount = Object.values(breakdown || {}).filter(v => v === 1).length;
+  const totalParams = Object.keys(breakdown).length;
+  const matchedCount = Object.values(breakdown).filter(v => v === 1).length;
+  
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col items-center gap-4">
       <ScoreCircle score={score} />
-      <div className="text-sm font-semibold">Matched Parameters: <span className="text-indigo-600">{matchedCount} / 10</span></div>
+      <div className="text-sm font-semibold">Matched Parameters: <span className="text-indigo-600">{matchedCount} / {totalParams}</span></div>
       <div className="text-xs text-slate-500">Weighted Score: <span className="font-medium">{Math.round(score)}%</span></div>
       <div className="text-xs text-slate-400 text-center">Score calculated from deterministic rule engine using above parameters</div>
     </div>

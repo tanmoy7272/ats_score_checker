@@ -1,5 +1,4 @@
 
-const { getAIScore } = require('../services/geminiScorer');
 const { extractStructuredFeatures } = require('../services/geminiExtractor');
 const { computeScore } = require('../services/scoreEngine');
 const { explain } = require('../services/geminiExplainer');
@@ -12,16 +11,19 @@ const calculateScore = async (req, res) => {
       return res.status(400).json({ error: 'Both resume and job features are required for scoring.' });
     }
 
-    const aiResult = await getAIScore(resume, job);
+    const { finalScore, breakdown } = computeScore(resume, job);
 
     return res.status(200).json({
       success: true,
-      result: aiResult
+      result: {
+        score: finalScore,
+        breakdown
+      }
     });
   } catch (error) {
     console.error('Error in scoreController:', error);
     return res.status(500).json({ 
-      error: error.message || 'Failed to calculate AI score.' 
+      error: error.message || 'Failed to calculate score.' 
     });
   }
 };
@@ -42,6 +44,11 @@ const calculateScoreV2 = async (req, res) => {
 
     // 3. compute deterministic score
     const { finalScore: score, breakdown } = computeScore(resumeFeatures, jobFeatures);
+
+    console.log('Score calculation complete:');
+    console.log('- Score:', score);
+    console.log('- Breakdown keys:', Object.keys(breakdown).length);
+    console.log('- Matched params:', Object.values(breakdown).filter(v => v === 1).length);
 
     // 4. generate explanation
     const explanation = await explain({ score, breakdown, resumeFeatures, jobFeatures });

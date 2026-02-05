@@ -23,24 +23,20 @@ const Icon = ({ score }) => {
 };
 
 const renderValue = (v) => {
-  if (v === undefined || v === null) return <span className="text-slate-400">—</span>;
+  if (v === undefined || v === null || v === '' || v === 'Not detected') {
+    return <span className="text-slate-400">Not detected</span>;
+  }
   if (Array.isArray(v)) {
-    if (v.length === 0) return <span className="text-slate-400">—</span>;
+    if (v.length === 0) return <span className="text-slate-400">Not detected</span>;
     return (
       <div className="flex flex-wrap gap-2">
         {v.map((x, i) => (
-          <span key={i} className="px-2 py-1 bg-slate-50 text-slate-700 rounded-md text-xs border">{x}</span>
+          <span key={i} className="px-2 py-1 bg-slate-50 text-slate-700 rounded-md text-xs border break-words whitespace-normal">{x}</span>
         ))}
       </div>
     );
   }
-  if (typeof v === 'object') {
-    const parts = [];
-    if (v.city) parts.push(v.city);
-    if (v.country) parts.push(v.country);
-    return <div className="text-sm text-slate-700">{parts.join(', ') || '—'}</div>;
-  }
-  return <div className="text-sm text-slate-700">{String(v)}</div>;
+  return <div className="text-sm text-slate-700 break-words whitespace-normal">{String(v)}</div>;
 };
 
 const ParameterItem = ({ label, resumeValue, jobValue, matchScore }) => {

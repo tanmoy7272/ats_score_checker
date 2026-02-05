@@ -1,58 +1,101 @@
+# ATS Resume Scorer
 
-# ATS Resume Scorer - Production Starter
-
-An intelligent, AI-powered Applicant Tracking System (ATS) that evaluates resumes against job descriptions using Google Gemini.
-
-## Project Structure
-- **Frontend (Root)**: React + Vite + Tailwind CSS
-- **Backend (server/)**: Node.js + Express + Multer + PDF/Docx Extraction + Gemini AI
+AI-powered resume evaluation system using 30 parameters with dual AI support (Gemini + OpenAI).
 
 ## Features
-- ✅ Multi-format support (PDF, DOCX)
-- ✅ Intelligent text extraction and cleaning
-- ✅ Skill/Experience/Degree feature detection
-- ✅ AI-powered scoring and gap analysis
-- ✅ Centralized error handling and rate limiting
-- ✅ Responsive modern UI
 
-## Getting Gemini API Key
-To use the AI scoring features, you need a Google Gemini API Key:
-1. Go to [Google AI Studio](https://aistudio.google.com/).
-2. Click on **"Get API key"** in the sidebar.
-3. Create a new API key in a new or existing project.
-4. Copy the key and paste it into your `server/.env` file (see below).
+- **30-Parameter Scoring** - Comprehensive evaluation across skills, experience, education, and more
+- **Dual AI Providers** - Gemini (primary) + OpenAI (automatic failover)
+- **Intelligent Matching** - Fuzzy text matching, synonym recognition, skill overlap analysis
+- **PDF & DOCX Support** - Automated text extraction and parsing
+- **Transparent Scoring** - See exactly which parameters match and why
 
-## Setup & Running
+## 30 Parameters (Weighted Scoring)
 
-### 1. Environment Variables
-Create a `.env` file in the `server/` directory:
+**Tier 1 (65%)** - Core Skills, Tools, Experience (relevant & total), Responsibilities, Job Title, Industry, Projects, Skill Coverage & Recency
+
+**Tier 2 (25%)** - Secondary Skills, Tool Proficiency, Employment Stability, Career Progression, Leadership, Education, Certifications, Portfolio
+
+**Tier 3 (10%)** - Location, Remote Preference, Notice Period, Employment Type, Keywords, Soft Skills, Achievements, Resume Quality
+
+## Quick Start
+
+### 1. Get API Key (Choose One or Both)
+
+**Gemini (Free)** - [Get key](https://aistudio.google.com/apikey) - 20 requests/day  
+**OpenAI (Recommended)** - [Get key](https://platform.openai.com/api-keys) - Pay-per-use (~$0.001/resume)
+
+### 2. Setup Environment
+
+Create `server/.env`:
+
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
-PORT=5001
-NODE_ENV=development
+AI_PROVIDER=openai                     # 'gemini' or 'openai'
+GEMINI_API_KEY=your_gemini_key_here
+OPENAI_API_KEY=your_openai_key_here
+PORT=5000
 ```
 
-### 2. Install Dependencies
-```bash
-# Root (Frontend)
-npm install
+### 3. Install & Run
 
-# Backend
-cd server
-npm install
+```bash
+npm install              # Installs all dependencies
+npm run dev              # Starts both servers
 ```
 
-### 3. Run the Application
+- Frontend: http://localhost:3000
+- Backend: http://localhost:5000
+
+## How It Works
+
+1. **Upload resume** (PDF/DOCX) → AI extracts 30 parameters
+2. **Paste job description** → AI extracts requirements
+3. **Get score** (0-100%) with detailed breakdown and suggestions
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/api/resume/upload` | POST | Upload & extract resume |
+| `/api/job/analyze` | POST | Analyze job description |
+| `/api/score/v2` | POST | Calculate score (30 params) |
+
+## Score Interpretation
+
+- **80-100%** - Excellent match, apply with confidence
+- **60-79%** - Good match, minor tweaks recommended
+- **40-59%** - Moderate match, review missing parameters
+- **0-39%** - Weak match, significant updates needed
+
+## Troubleshooting
+
+**Check if servers are running:**
 ```bash
-# Start the server (includes frontend serving)
-cd server
+ps aux | grep -E "node.*server|vite" | grep -v grep
+curl http://localhost:5000/health
+```
+
+**Gemini quota exceeded (429):**
+- Wait 24 hours OR switch to OpenAI: `AI_PROVIDER=openai`
+
+**Parameters showing "Not detected":**
+- Check API keys in `server/.env`
+- Check server logs for error messages
+
+**Port already in use:**
+```bash
+pkill -f "node.*server.js" && pkill -f "vite"
 npm run dev
 ```
 
-The app will be available at `http://localhost:5001/`.
+## Tech Stack
 
-## API Endpoints
-- `GET /health`: Server health check
-- `POST /api/resume/upload`: Process resume file
-- `POST /api/job/analyze`: Process JD text
-- `POST /api/score`: Final AI comparison
+- **Frontend:** React 19, Vite 6, Tailwind CSS, TypeScript
+- **Backend:** Node.js, Express 4, Multer, pdf-parse, mammoth
+- **AI:** Gemini 1.5 Pro, GPT-4o-mini
+- **Scoring:** Custom deterministic engine with fuzzy matching
+
+## License
+
+MIT

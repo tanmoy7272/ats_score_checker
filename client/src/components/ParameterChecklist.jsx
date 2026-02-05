@@ -1,29 +1,56 @@
 import React from 'react';
 import ParameterItem from './ParameterItem';
 
-const ORDER = [
-  { key: 'skills', label: 'Skills' },
-  { key: 'tools', label: 'Tools' },
-  { key: 'title', label: 'Job Title' },
-  { key: 'experience', label: 'Experience' },
-  { key: 'location', label: 'Location' },
-  { key: 'industry', label: 'Industry' },
-  { key: 'education', label: 'Education' },
-  { key: 'certification', label: 'Certifications' },
-  { key: 'responsibility', label: 'Responsibilities' },
-  { key: 'keywords', label: 'Keywords' }
-];
+const PARAMETER_LABELS = {
+  coreSkills: 'Core Skills',
+  secondarySkills: 'Secondary Skills',
+  tools: 'Tools',
+  relevantExperience: 'Relevant Experience',
+  totalExperience: 'Total Experience',
+  responsibilities: 'Responsibilities',
+  title: 'Job Title',
+  industry: 'Industry',
+  projectRelevance: 'Project Relevance',
+  skillCoverage: 'Skill Coverage',
+  skillRecency: 'Skill Recency',
+  toolProficiency: 'Tool Proficiency',
+  employmentStability: 'Employment Stability',
+  careerProgression: 'Career Progression',
+  responsibilityComplexity: 'Responsibility Complexity',
+  leadership: 'Leadership',
+  educationLevel: 'Education Level',
+  educationField: 'Education Field',
+  certifications: 'Certifications',
+  portfolio: 'Portfolio',
+  city: 'City',
+  country: 'Country',
+  remotePreference: 'Remote Preference',
+  noticePeriod: 'Notice Period',
+  employmentType: 'Employment Type',
+  keywords: 'Keywords',
+  softSkills: 'Soft Skills',
+  achievements: 'Achievements',
+  resumeStructure: 'Resume Structure',
+  languageQuality: 'Language Quality'
+};
 
 const ParameterChecklist = ({ breakdown = {}, resume = {}, job = {} }) => {
+  const formatValue = (value) => {
+    if (value === null || value === undefined || value === '') return 'Not detected';
+    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : 'Not detected';
+    if (typeof value === 'number') return value.toString();
+    return value || 'Not detected';
+  };
+
   return (
     <div className="space-y-4">
-      {ORDER.map(p => (
+      {Object.keys(breakdown).map(key => (
         <ParameterItem
-          key={p.key}
-          label={p.label}
-          resumeValue={resume[p.key === 'experience' ? 'yearsExperience' : (p.key === 'industry' ? 'industries' : p.key)]}
-          jobValue={job[p.key === 'experience' ? 'yearsExperience' : (p.key === 'industry' ? 'industries' : p.key)]}
-          matchScore={breakdown?.[p.key] ?? 0}
+          key={key}
+          label={PARAMETER_LABELS[key] || key}
+          resumeValue={formatValue(resume[key])}
+          jobValue={formatValue(job[key])}
+          matchScore={breakdown[key] ?? 0}
         />
       ))}
     </div>

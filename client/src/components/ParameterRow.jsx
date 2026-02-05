@@ -11,34 +11,31 @@ const Icon = ({ score }) => {
 };
 
 const renderValue = (v) => {
-  if (v === undefined || v === null) return <span className="text-slate-400 text-sm">—</span>;
+  if (v === undefined || v === null || v === '' || v === 'Not detected') {
+    return <span className="text-slate-400 text-sm">Not detected</span>;
+  }
+  
   if (Array.isArray(v)) {
-    if (v.length === 0) return <span className="text-slate-400 text-sm">—</span>;
+    if (v.length === 0) return <span className="text-slate-400 text-sm">Not detected</span>;
     return (
-      <div className="flex flex-wrap gap-1">
-        {v.slice(0, 3).map((x, i) => (
-          <span key={i} className="px-2 py-0.5 bg-slate-50 text-slate-700 rounded-md text-xs border">{x}</span>
+      <div className="flex flex-wrap gap-2 max-w-full">
+        {v.map((x, i) => (
+          <span key={i} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs border border-slate-200 break-words whitespace-normal">{x}</span>
         ))}
-        {v.length > 3 && <span className="text-xs text-slate-500">+{v.length - 3}</span>}
       </div>
     );
   }
-  if (typeof v === 'object') {
-    const parts = [];
-    if (v.city) parts.push(v.city);
-    if (v.country) parts.push(v.country);
-    return <div className="text-sm text-slate-700">{parts.join(', ') || '—'}</div>;
-  }
-  return <div className="text-sm text-slate-700">{String(v)}</div>;
+  
+  return <div className="text-sm text-slate-700 break-words whitespace-normal max-w-full">{String(v)}</div>;
 };
 
 const ParameterRow = ({ label, resumeValue, jobValue, matchScore }) => {
   return (
-    <div className="grid grid-cols-4 gap-0 p-4 items-center hover:bg-slate-50 transition-colors border-b last:border-b-0">
-      <div className="font-medium text-slate-900">{label}</div>
-      <div className="text-sm text-slate-700 pr-4">{renderValue(resumeValue)}</div>
-      <div className="text-sm text-slate-700 pr-4">{renderValue(jobValue)}</div>
-      <div className="flex justify-center">
+    <div className="grid grid-cols-4 gap-4 px-4 py-3 items-start hover:bg-slate-50 transition-colors border-b last:border-b-0">
+      <div className="font-medium text-slate-900 text-sm">{label}</div>
+      <div className="text-sm text-slate-700">{renderValue(resumeValue)}</div>
+      <div className="text-sm text-slate-700">{renderValue(jobValue)}</div>
+      <div className="flex justify-center items-start pt-1">
         <Icon score={matchScore} />
       </div>
     </div>

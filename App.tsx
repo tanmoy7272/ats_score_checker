@@ -50,7 +50,7 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 pb-20">
         <header className="mb-10 text-center">
           <h1 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Resume ATS Score Analyzer</h1>
-          <p className="mt-2 text-slate-500 max-w-2xl mx-auto">Upload your resume and job description to see detailed matching analysis across 10 key parameters.</p>
+          <p className="mt-2 text-slate-500 max-w-2xl mx-auto">Upload your resume and job description to see detailed matching analysis across 30 parameters.</p>
         </header>
 
         {/* Input Section */}
@@ -115,7 +115,7 @@ const App: React.FC = () => {
         {result && (
           <div className="space-y-8 animate-in slide-in-from-right-8 duration-500">
             {/* 3-Column Dashboard Header */}
-            <DashboardHeader score={result.score} />
+            <DashboardHeader score={result.score} breakdown={result.breakdown} />
 
             {/* Parameter Comparison Table */}
             <div>
