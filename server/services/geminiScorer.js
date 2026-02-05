@@ -2,6 +2,77 @@ const { matchArrays, matchArraysKeywords } = require('../utils/arrayOverlap');
 const { fuzzyTextMatch } = require('../utils/fuzzyMatch');
 const { areSynonyms } = require('../utils/synonymNormalizer');
 
+const VALID_TOOLS = ['git', 'github', 'gitlab', 'postman', 'vscode', 'npm', 'yarn', 'docker', 'kubernetes', 'jenkins', 'jira', 'ci/cd'];
+
+const INDUSTRY_MAP = {
+  'software': 'technology',
+  'web': 'technology',
+  'app': 'technology',
+  'development': 'technology',
+  'saas': 'technology',
+  'it': 'technology',
+  'information technology': 'technology',
+  'tech': 'technology'
+};
+
+const TITLE_KEYWORDS = {
+  'developer': ['web developer', 'software developer', 'full stack', 'frontend', 'backend', 'engineer'],
+  'engineer': ['software engineer', 'web developer', 'developer', 'full stack'],
+  'computer': ['it', 'technology', 'software', 'computer science', 'mca', 'bca']
+};
+
+function normalizeIndustry(industry) {
+  if (!industry) return '';
+  const lower = industry.toLowerCase().trim();
+  for (const [key, normalized] of Object.entries(INDUSTRY_MAP)) {
+    if (lower.includes(key)) return normalized;
+  }
+  return lower;
+}
+
+function filterTools(tools) {
+  if (!Array.isArray(tools)) return [];
+  return tools.filter(tool => {
+    const lower = tool.toLowerCase();
+    return VALID_TOOLS.some(valid => lower.includes(valid) || valid.includes(lower)) && !lower.includes('api');
+  });
+}
+
+function lenientTextMatch(text1, text2, keywords) {
+  if (!text1 || !text2) return 0;
+  const t1 = text1.toLowerCase().trim();
+  const t2 = text2.toLowerCase().trim();
+  
+  if (t1 === t2) return 1;
+  if (t1.includes(t2) || t2.includes(t1)) return 1;
+  
+  if (keywords) {
+    for (const [key, similar] of Object.entries(keywords)) {
+      const in1 = t1.includes(key) || similar.some(s => t1.includes(s));
+      const in2 = t2.includes(key) || similar.some(s => t2.includes(s));
+      if (in1 && in2) return 1;
+    }
+  }
+  
+  const fuzzy = fuzzyTextMatch(t1, t2);
+  return fuzzy >= 0.4 ? (fuzzy >= 0.7 ? 1 : 0.5) : 0;
+}
+
+function computeSkillCoverage(resumeSkills, jobSkills) {
+  const resume = [...(resumeSkills.coreSkills || []), ...(resumeSkills.secondarySkills || [])];
+  const job = [...(jobSkills.coreSkills || []), ...(jobSkills.secondarySkills || [])];
+  
+  if (job.length === 0) return 0;
+  
+  const resumeSet = new Set(resume.map(s => s.toLowerCase().trim()));
+  const intersection = job.filter(skill => resumeSet.has(skill.toLowerCase().trim()));
+  const ratio = intersection.length / job.length;
+  
+  if (ratio >= 0.6) return 1;
+  if (ratio >= 0.3) return 0.5;
+  return 0;
+}
+
 /**
  * Simple deterministic matcher - no AI scoring
  * Returns 0, 0.5, or 1 for each parameter
@@ -9,10 +80,13 @@ const { areSynonyms } = require('../utils/synonymNormalizer');
 function getParameterMatches(resumeFeatures, jobFeatures) {
   const matches = {};
   
+  const resumeTools = filterTools(resumeFeatures.tools || []);
+  const jobTools = filterTools(jobFeatures.tools || []);
+  
   // Arrays - use overlap ratio
   matches.coreSkills = matchArrays(jobFeatures.coreSkills || [], resumeFeatures.coreSkills || []);
   matches.secondarySkills = matchArrays(jobFeatures.secondarySkills || [], resumeFeatures.secondarySkills || []);
-  matches.tools = matchArrays(jobFeatures.tools || [], resumeFeatures.tools || []);
+  matches.tools = matchArrays(jobTools, resumeTools);
   matches.responsibilities = matchArraysKeywords(jobFeatures.responsibilities || [], resumeFeatures.responsibilities || []);
   matches.keywords = matchArrays(jobFeatures.keywords || [], resumeFeatures.keywords || []);
   matches.softSkills = matchArrays(jobFeatures.softSkills || [], resumeFeatures.softSkills || []);
@@ -46,44 +120,21 @@ function getParameterMatches(resumeFeatures, jobFeatures) {
     matches.totalExperience = 0;
   }
   
-  // Text - use fuzzy + synonyms
-  const jobTitle = jobFeatures.title || '';
-  const resumeTitle = resumeFeatures.title || '';
-  if (!jobTitle || !resumeTitle) {
-    matches.title = 0;
-  } else if (areSynonyms(jobTitle, resumeTitle, 'title')) {
-    matches.title = 1;
-  } else {
-    matches.title = fuzzyTextMatch(jobTitle, resumeTitle);
-  }
+  // Text - use lenient matching
+  matches.title = lenientTextMatch(resumeFeatures.title, jobFeatures.title, TITLE_KEYWORDS);
   
-  const jobIndustry = jobFeatures.industry || '';
-  const resumeIndustry = resumeFeatures.industry || '';
-  if (!jobIndustry || !resumeIndustry) {
+  const resumeInd = normalizeIndustry(resumeFeatures.industry);
+  const jobInd = normalizeIndustry(jobFeatures.industry);
+  if (!jobInd || !resumeInd) {
     matches.industry = 0;
-  } else if (areSynonyms(jobIndustry, resumeIndustry, 'industry')) {
+  } else if (resumeInd === jobInd) {
     matches.industry = 1;
   } else {
-    matches.industry = fuzzyTextMatch(jobIndustry, resumeIndustry);
+    matches.industry = lenientTextMatch(resumeInd, jobInd);
   }
   
-  const jobEduLevel = jobFeatures.educationLevel || '';
-  const resumeEduLevel = resumeFeatures.educationLevel || '';
-  if (!jobEduLevel || !resumeEduLevel) {
-    matches.educationLevel = 0;
-  } else if (areSynonyms(jobEduLevel, resumeEduLevel, 'education')) {
-    matches.educationLevel = 1;
-  } else {
-    matches.educationLevel = fuzzyTextMatch(jobEduLevel, resumeEduLevel);
-  }
-  
-  const jobEduField = jobFeatures.educationField || '';
-  const resumeEduField = resumeFeatures.educationField || '';
-  if (!jobEduField || !resumeEduField) {
-    matches.educationField = 0;
-  } else {
-    matches.educationField = fuzzyTextMatch(jobEduField, resumeEduField);
-  }
+  matches.educationLevel = lenientTextMatch(resumeFeatures.educationLevel, jobFeatures.educationLevel, TITLE_KEYWORDS);
+  matches.educationField = lenientTextMatch(resumeFeatures.educationField, jobFeatures.educationField, TITLE_KEYWORDS);
   
   // Location
   const jobCity = jobFeatures.city || '';
@@ -119,22 +170,24 @@ function getParameterMatches(resumeFeatures, jobFeatures) {
     matches.employmentType = fuzzyTextMatch(jobEmpType, resumeEmpType);
   }
   
-  // Quality indicators - presence check
-  matches.projectRelevance = (resumeFeatures.projects && resumeFeatures.projects.length > 0) ? 1 : 0;
+  // Quality indicators - lenient presence check
+  const hasProjects = (resumeFeatures.projects && resumeFeatures.projects.length > 0) || 
+                     (resumeFeatures.achievements && resumeFeatures.achievements.length > 0);
+  const isDev = (jobFeatures.title || '').toLowerCase().includes('developer') || 
+                (jobFeatures.title || '').toLowerCase().includes('engineer');
+  
+  if (hasProjects && isDev) {
+    matches.projectRelevance = 0.5;
+  } else if (hasProjects) {
+    matches.projectRelevance = 1;
+  } else {
+    matches.projectRelevance = 0;
+  }
+  
   matches.portfolio = resumeFeatures.portfolio ? 1 : 0;
   
-  // Skill coverage ratio
-  const totalJobSkills = (jobFeatures.coreSkills || []).length + (jobFeatures.secondarySkills || []).length;
-  const totalResumeSkills = (resumeFeatures.coreSkills || []).length + (resumeFeatures.secondarySkills || []).length;
-  if (totalJobSkills === 0 || totalResumeSkills === 0) {
-    matches.skillCoverage = 0;
-  } else if (totalResumeSkills >= totalJobSkills) {
-    matches.skillCoverage = 1;
-  } else if (totalResumeSkills >= totalJobSkills * 0.6) {
-    matches.skillCoverage = 0.5;
-  } else {
-    matches.skillCoverage = 0;
-  }
+  // Skill coverage - always compute
+  matches.skillCoverage = computeSkillCoverage(resumeFeatures, jobFeatures);
   
   // Quality assessments
   const skillRecency = resumeFeatures.skillRecency || '';

@@ -1,16 +1,52 @@
-/**
- * Calculate overlap ratio between two arrays
- */
+const SKILL_FAMILIES = {
+  'react': 'frontend_js',
+  'react.js': 'frontend_js',
+  'reactjs': 'frontend_js',
+  'next': 'frontend_js',
+  'next.js': 'frontend_js',
+  'nextjs': 'frontend_js',
+  'vue': 'frontend_js',
+  'vue.js': 'frontend_js',
+  'angular': 'frontend_js',
+  'svelte': 'frontend_js',
+  'node': 'backend_js',
+  'node.js': 'backend_js',
+  'nodejs': 'backend_js',
+  'nest': 'backend_js',
+  'nestjs': 'backend_js',
+  'express': 'backend_js',
+  'expressjs': 'backend_js',
+  'mongo': 'database',
+  'mongodb': 'database',
+  'postgres': 'database',
+  'postgresql': 'database',
+  'mysql': 'database',
+  'sql': 'database',
+  'redis': 'database',
+  'javascript': 'javascript',
+  'js': 'javascript',
+  'typescript': 'javascript',
+  'ts': 'javascript'
+};
+
+function getSkillFamily(skill) {
+  const lower = skill.toLowerCase().trim();
+  for (const [key, family] of Object.entries(SKILL_FAMILIES)) {
+    if (lower === key || lower.includes(key) || key.includes(lower)) {
+      return family;
+    }
+  }
+  return lower;
+}
+
 function calculateOverlap(arr1, arr2) {
   if (!arr1 || !arr2 || arr1.length === 0 || arr2.length === 0) return 0;
   
-  const normalize = (str) => str.toLowerCase().trim();
+  const families1 = new Set(arr1.map(getSkillFamily));
+  const families2 = new Set(arr2.map(getSkillFamily));
   
-  const set1 = new Set(arr1.map(normalize));
-  const set2 = new Set(arr2.map(normalize));
-  
-  const intersection = new Set([...set1].filter(item => set2.has(item)));
-  const smaller = Math.min(set1.size, set2.size);
+  const intersection = new Set([...families1].filter(item => families2.has(item)));
+  const smaller = Math.min(families1.size, families2.size);
   
   return intersection.size / smaller;
 }

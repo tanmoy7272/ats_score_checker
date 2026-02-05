@@ -1,5 +1,18 @@
 const { AIClient } = require('./aiClient');
 
+// FIX 2: Valid dev tools only
+const INVALID_TOOL_KEYWORDS = ['api', 'weather', 'map', 'locationiq', 'openmeteo', 'usgs', 'service'];
+
+// FIX 6: City to country mapping
+const CITY_COUNTRY_MAP = {
+  'mumbai': 'India', 'delhi': 'India', 'bangalore': 'India', 'bengaluru': 'India',
+  'pune': 'India', 'hyderabad': 'India', 'chennai': 'India', 'kolkata': 'India',
+  'ahmedabad': 'India', 'jaipur': 'India', 'indore': 'India', 'noida': 'India',
+  'gurgaon': 'India', 'gurugram': 'India', 'new york': 'USA', 'los angeles': 'USA',
+  'chicago': 'USA', 'san francisco': 'USA', 'london': 'UK', 'manchester': 'UK',
+  'toronto': 'Canada', 'sydney': 'Australia', 'singapore': 'Singapore'
+};
+
 const PROMPT = `You are an extractor. Given a resume or job description, return JSON only that matches this schema exactly:
 {
   coreSkills: string[],
@@ -90,21 +103,56 @@ async function extractStructuredFeatures(text) {
   }
 
   try {
+    // FIX 1: Truncate text to 12000 chars
+    const truncatedText = text.slice(0, 12000);
+    
     const aiClient = new AIClient();
-    const prompt = `${PROMPT}\n\nText:\n${text}`;
+    const prompt = `${PROMPT}\n\nText:\n${truncatedText}`;
     const txt = await aiClient.generateContent(prompt);
     const clean = txt.replace(/```json|```/g, '').trim();
 
     const parsed = JSON.parse(clean);
+    
+    // FIX 2: Filter out invalid tools
+    let tools = (parsed.tools || []).filter(tool => {
+      const lower = tool.toLowerCase();
+      return !INVALID_TOOL_KEYWORDS.some(invalid => lower.includes(invalid));
+    });
+    
+    // FIX 3: Ensure totalExperience >= relevantExperience
+    let relevantExp = typeof parsed.relevantExperience === 'number' ? parsed.relevantExperience : 0;
+    let totalExp = typeof parsed.totalExperience === 'number' ? parsed.totalExperience : 0;
+    if (totalExp < relevantExp) {
+      totalExp = relevantExp;
+    }
+    
+    // FIX 5: Industry fallback
+    let industry = parsed.industry || '';
+    if (!industry) {
+      const lower = text.toLowerCase();
+      const techKeywords = ['software', 'web', 'dev', 'app', 'code', 'programming', 'engineer', 'tech', 'it'];
+      if (techKeywords.some(kw => lower.includes(kw))) {
+        industry = 'Technology';
+      }
+    }
+    
+    // FIX 6: Auto-fill country from city
+    let city = parsed.city || '';
+    let country = parsed.country || '';
+    if (city && !country) {
+      const cityLower = city.toLowerCase().trim();
+      country = CITY_COUNTRY_MAP[cityLower] || '';
+    }
+    
     return {
       coreSkills: parsed.coreSkills || [],
       secondarySkills: parsed.secondarySkills || [],
-      tools: parsed.tools || [],
+      tools: tools,
       title: parsed.title || '',
-      relevantExperience: typeof parsed.relevantExperience === 'number' ? parsed.relevantExperience : 0,
-      totalExperience: typeof parsed.totalExperience === 'number' ? parsed.totalExperience : 0,
+      relevantExperience: relevantExp,
+      totalExperience: totalExp,
       responsibilities: parsed.responsibilities || [],
-      industry: parsed.industry || '',
+      industry: industry,
       projects: parsed.projects || [],
       skillRecency: parsed.skillRecency || '',
       toolProficiency: parsed.toolProficiency || [],
@@ -116,8 +164,8 @@ async function extractStructuredFeatures(text) {
       educationField: parsed.educationField || '',
       certifications: parsed.certifications || [],
       portfolio: parsed.portfolio || '',
-      city: parsed.city || '',
-      country: parsed.country || '',
+      city: city,
+      country: country,
       remotePreference: parsed.remotePreference || '',
       noticePeriod: parsed.noticePeriod || '',
       employmentType: parsed.employmentType || '',
