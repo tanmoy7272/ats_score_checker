@@ -65,6 +65,26 @@ RULES:
 - If missing/unsure: [] or "" or 0
 - NO explanations, NO analysis, ONLY JSON`;
 
+function parseJsonFromText(text) {
+  if (!text) {
+    throw new Error('Empty AI response');
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
+      const slice = text.slice(start, end + 1)
+        .replace(/,\s*}/g, '}')
+        .replace(/,\s*]/g, ']');
+      return JSON.parse(slice);
+    }
+    throw err;
+  }
+}
+
 function preprocessJD(text) {
   if (!text) return text;
   return text
@@ -116,8 +136,7 @@ async function extractStructuredFeatures(text, isJD = false) {
     const prompt = `${PROMPT}\n\nText:\n${cleanText}`;
     const txt = await aiClient.generateContent(prompt);
     const clean = txt.replace(/```json|```/g, '').trim();
-
-    const parsed = JSON.parse(clean);
+    const parsed = parseJsonFromText(clean);
     
     const tools = (parsed.tools || []).filter(tool => {
       const lower = tool.toLowerCase();
