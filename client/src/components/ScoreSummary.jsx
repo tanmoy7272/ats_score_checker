@@ -16,7 +16,7 @@ const ScoreCircle = ({ score }) => {
 
 const ScoreSummary = ({ score, breakdown }) => {
   const totalParams = Object.keys(breakdown).length;
-  const matchedCount = Object.values(breakdown).filter(v => v === 1).length;
+  const matchedCount = Object.values(breakdown).filter(p => p.match > 0).length;
   
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col items-center gap-4">

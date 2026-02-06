@@ -3,7 +3,7 @@ import React from 'react';
 const DashboardHeader = ({ score = 0, breakdown = {} }) => {
   const scoreColor = score >= 75 ? 'bg-emerald-600' : score >= 50 ? 'bg-amber-500' : 'bg-rose-500';
   const totalParams = Object.keys(breakdown).length;
-  const matchedCount = Object.values(breakdown).filter(v => v === 1).length;
+  const matchedCount = Object.values(breakdown).filter(p => p.match > 0).length;
 
   return (
     <div className="bg-white rounded-2xl p-8 shadow-md border border-slate-200">

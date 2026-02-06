@@ -1,61 +1,21 @@
-const SKILL_FAMILIES = {
-  'react': 'frontend_js',
-  'react.js': 'frontend_js',
-  'reactjs': 'frontend_js',
-  'next': 'frontend_js',
-  'next.js': 'frontend_js',
-  'nextjs': 'frontend_js',
-  'vue': 'frontend_js',
-  'vue.js': 'frontend_js',
-  'angular': 'frontend_js',
-  'svelte': 'frontend_js',
-  'node': 'backend_js',
-  'node.js': 'backend_js',
-  'nodejs': 'backend_js',
-  'nest': 'backend_js',
-  'nestjs': 'backend_js',
-  'express': 'backend_js',
-  'expressjs': 'backend_js',
-  'mongo': 'database',
-  'mongodb': 'database',
-  'postgres': 'database',
-  'postgresql': 'database',
-  'mysql': 'database',
-  'sql': 'database',
-  'redis': 'database',
-  'javascript': 'javascript',
-  'js': 'javascript',
-  'typescript': 'javascript',
-  'ts': 'javascript'
-};
-
-function getSkillFamily(skill) {
-  const lower = skill.toLowerCase().trim();
-  for (const [key, family] of Object.entries(SKILL_FAMILIES)) {
-    if (lower === key || lower.includes(key) || key.includes(lower)) {
-      return family;
-    }
-  }
-  return lower;
-}
+const { normalizeToken } = require('./synonymNormalizer');
 
 function calculateOverlap(arr1, arr2) {
-  if (!arr1 || !arr2 || arr1.length === 0 || arr2.length === 0) return 0;
+  if (!arr1 || !arr2 || arr1.length === 0 || arr2.length === 0) return { ratio: 0, matched: 0, required: 0 };
   
-  const families1 = new Set(arr1.map(getSkillFamily));
-  const families2 = new Set(arr2.map(getSkillFamily));
+  const set1 = new Set(arr1.map(normalizeToken));
+  const set2 = new Set(arr2.map(normalizeToken));
   
-  const intersection = new Set([...families1].filter(item => families2.has(item)));
-  const smaller = Math.min(families1.size, families2.size);
+  const intersection = new Set([...set1].filter(item => set2.has(item)));
+  const ratio = intersection.size / arr2.length;
   
-  return intersection.size / smaller;
+  return { ratio, matched: intersection.size, required: arr2.length };
 }
 
-/**
- * Match arrays using keyword overlap (for responsibilities)
- */
 function matchArraysKeywords(required, candidate) {
-  if (!required || !candidate || required.length === 0 || candidate.length === 0) return 0;
+  if (!required || !candidate || required.length === 0 || candidate.length === 0) {
+    return { match: 0, reason: 'No data provided' };
+  }
   
   const tokenize = (arr) => {
     const tokens = new Set();
@@ -72,25 +32,32 @@ function matchArraysKeywords(required, candidate) {
   const tokens1 = tokenize(required);
   const tokens2 = tokenize(candidate);
   
-  if (tokens1.size === 0 || tokens2.size === 0) return 0;
+  if (tokens1.size === 0 || tokens2.size === 0) {
+    return { match: 0, reason: 'No data provided' };
+  }
   
   const intersection = new Set([...tokens1].filter(t => tokens2.has(t)));
-  const smaller = Math.min(tokens1.size, tokens2.size);
-  const overlap = intersection.size / smaller;
+  const matched = intersection.size;
+  const total = tokens1.size;
+  const ratio = matched / total;
   
-  if (overlap >= 0.6) return 1;
-  if (overlap >= 0.3) return 0.5;
+  if (ratio >= 0.6) return { match: 1, reason: `Strong match (${matched}/${total} keywords)` };
+  if (ratio >= 0.3) return { match: 0.5, reason: `Partial match (${matched}/${total} keywords)` };
   
-  return 0;
+  return { match: 0, reason: `Low overlap (${matched}/${total} keywords)` };
 }
 
 function matchArrays(required, candidate) {
-  const overlap = calculateOverlap(required, candidate);
+  if (!required || !candidate || required.length === 0 || candidate.length === 0) {
+    return { match: 0, reason: 'No data provided' };
+  }
   
-  if (overlap >= 0.6) return 1;
-  if (overlap >= 0.3) return 0.5;
+  const { ratio, matched, required: total } = calculateOverlap(required, candidate);
   
-  return 0;
+  if (ratio >= 0.6) return { match: 1, reason: `${matched} of ${total} matched` };
+  if (ratio >= 0.3) return { match: 0.5, reason: `${matched} of ${total} matched` };
+  
+  return { match: 0, reason: `Only ${matched} of ${total} matched` };
 }
 
 module.exports = { calculateOverlap, matchArrays, matchArraysKeywords };

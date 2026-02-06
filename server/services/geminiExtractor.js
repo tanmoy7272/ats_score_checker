@@ -1,9 +1,7 @@
 const { AIClient } = require('./aiClient');
 
-// FIX 2: Valid dev tools only
 const INVALID_TOOL_KEYWORDS = ['api', 'weather', 'map', 'locationiq', 'openmeteo', 'usgs', 'service'];
 
-// FIX 6: City to country mapping
 const CITY_COUNTRY_MAP = {
   'mumbai': 'India', 'delhi': 'India', 'bangalore': 'India', 'bengaluru': 'India',
   'pune': 'India', 'hyderabad': 'India', 'chennai': 'India', 'kolkata': 'India',
@@ -13,61 +11,70 @@ const CITY_COUNTRY_MAP = {
   'toronto': 'Canada', 'sydney': 'Australia', 'singapore': 'Singapore'
 };
 
-const PROMPT = `You are an extractor. Given a resume or job description, return JSON only that matches this schema exactly:
+const PROMPT = `Extract structured JSON from resume or job description.
+Return ONLY valid JSON matching this exact schema:
 {
-  coreSkills: string[],
-  secondarySkills: string[],
-  tools: string[],
-  title: string,
-  relevantExperience: number,
-  totalExperience: number,
-  responsibilities: string[],
-  industry: string,
-  projects: string[],
-  skillRecency: string,
-  toolProficiency: string[],
-  employmentStability: string,
-  careerProgression: string,
-  responsibilityComplexity: string,
-  leadership: string[],
-  educationLevel: string,
-  educationField: string,
-  certifications: string[],
-  portfolio: string,
-  city: string,
-  country: string,
-  remotePreference: string,
-  noticePeriod: string,
-  employmentType: string,
-  keywords: string[],
-  softSkills: string[],
-  achievements: string[],
-  resumeStructure: string,
-  languageQuality: string
+  "coreSkills": ["skill1", "skill2"],
+  "secondarySkills": ["skill1"],
+  "tools": ["tool1"],
+  "title": "string",
+  "relevantExperience": 0,
+  "totalExperience": 0,
+  "responsibilities": ["resp1"],
+  "industry": "string",
+  "projects": ["proj1"],
+  "skillRecency": "Current|Recent|Outdated|",
+  "toolProficiency": ["tool1"],
+  "employmentStability": "Stable|Frequent Changes|Unknown|",
+  "careerProgression": "Growing|Lateral|Declining|Unknown|",
+  "responsibilityComplexity": "High|Medium|Low|",
+  "leadership": ["lead1"],
+  "educationLevel": "Bachelor|Master|PhD|",
+  "educationField": "string",
+  "certifications": ["cert1"],
+  "portfolio": "string",
+  "city": "string",
+  "country": "string",
+  "remotePreference": "Remote|Hybrid|Onsite|",
+  "noticePeriod": "string",
+  "employmentType": "Full-time|Contract|Part-time|",
+  "keywords": ["kw1"],
+  "softSkills": ["skill1"],
+  "achievements": ["ach1"],
+  "resumeStructure": "Well-structured|Basic|Poor|",
+  "languageQuality": "Excellent|Good|Fair|"
 }
 
-EXTRACTION RULES:
-- Extract ONLY what exists in the text
-- Normalize similar concepts (e.g., "B.Tech", "BE", "Bachelor of Engineering" → "Bachelor")
-- Group equivalent terms (e.g., "Software Developer", "Web Developer" → use most common form)
-- Extract tools/technologies from ANYWHERE in text (not just headers): Node.js, React, AWS, Docker, etc.
-- Never hallucinate or infer
-- If unsure or not present → return [] or "" or 0
-- For experience: Parse "X months" as X/12 years (6 months = 0.5, 12 months = 1.0)
-- For experience: relevantExperience = years in similar role, totalExperience = total career years
-- For skillRecency: "Current", "Recent", "Outdated", or ""
-- For employmentStability: "Stable", "Frequent Changes", "Unknown", or ""
-- For careerProgression: "Growing", "Lateral", "Declining", "Unknown", or ""
-- For responsibilityComplexity: "High", "Medium", "Low", or ""
-- For educationLevel: "Bachelor", "Master", "PhD", or ""
-- For remotePreference: "Remote", "Hybrid", "Onsite", or ""
-- For employmentType: "Full-time", "Contract", "Part-time", or ""
-- For resumeStructure: "Well-structured", "Basic", "Poor", or ""
-- For languageQuality: "Excellent", "Good", "Fair", or ""
+LIMITS:
+- coreSkills: max 30
+- secondarySkills: max 30
+- tools: max 20
+- responsibilities: max 10
+- projects: max 10
+- keywords: max 30
+- softSkills: max 15
+- achievements: max 10
+- leadership: max 10
+- certifications: max 10
+- toolProficiency: max 20
 
-Return valid JSON only. No scoring, no explanations, no additional fields.`;
+RULES:
+- Extract ONLY what exists
+- Normalize equivalents: "B.Tech"/"BE" → "Bachelor", "React"/"ReactJS" → "React"
+- Experience in months: convert to years (6 months = 0.5)
+- If missing/unsure: [] or "" or 0
+- NO explanations, NO analysis, ONLY JSON`;
 
-async function extractStructuredFeatures(text) {
+function preprocessJD(text) {
+  if (!text) return text;
+  return text
+    .replace(/^[\s\S]*?job\s+(description|summary|overview|role)?[:\s]*/i, '')
+    .replace(/benefits?[\s]*[\s\S]{0,500}$/i, '')
+    .replace(/legal.*?disclaimers?[\s\S]{0,300}$/i, '')
+    .slice(0, 8000);
+}
+
+async function extractStructuredFeatures(text, isJD = false) {
   if (!text) {
     return {
       coreSkills: [],
@@ -103,30 +110,26 @@ async function extractStructuredFeatures(text) {
   }
 
   try {
-    // FIX 1: Truncate text to 12000 chars
-    const truncatedText = text.slice(0, 12000);
+    const cleanText = isJD ? preprocessJD(text).slice(0, 6000) : text.slice(0, 10000);
     
     const aiClient = new AIClient();
-    const prompt = `${PROMPT}\n\nText:\n${truncatedText}`;
+    const prompt = `${PROMPT}\n\nText:\n${cleanText}`;
     const txt = await aiClient.generateContent(prompt);
     const clean = txt.replace(/```json|```/g, '').trim();
 
     const parsed = JSON.parse(clean);
     
-    // FIX 2: Filter out invalid tools
-    let tools = (parsed.tools || []).filter(tool => {
+    const tools = (parsed.tools || []).filter(tool => {
       const lower = tool.toLowerCase();
       return !INVALID_TOOL_KEYWORDS.some(invalid => lower.includes(invalid));
-    });
+    }).slice(0, 20);
     
-    // FIX 3: Ensure totalExperience >= relevantExperience
     let relevantExp = typeof parsed.relevantExperience === 'number' ? parsed.relevantExperience : 0;
     let totalExp = typeof parsed.totalExperience === 'number' ? parsed.totalExperience : 0;
     if (totalExp < relevantExp) {
       totalExp = relevantExp;
     }
     
-    // FIX 5: Industry fallback
     let industry = parsed.industry || '';
     if (!industry) {
       const lower = text.toLowerCase();
@@ -136,7 +139,6 @@ async function extractStructuredFeatures(text) {
       }
     }
     
-    // FIX 6: Auto-fill country from city
     let city = parsed.city || '';
     let country = parsed.country || '';
     if (city && !country) {
@@ -145,33 +147,33 @@ async function extractStructuredFeatures(text) {
     }
     
     return {
-      coreSkills: parsed.coreSkills || [],
-      secondarySkills: parsed.secondarySkills || [],
-      tools: tools,
+      coreSkills: (parsed.coreSkills || []).slice(0, 30),
+      secondarySkills: (parsed.secondarySkills || []).slice(0, 30),
+      tools,
       title: parsed.title || '',
       relevantExperience: relevantExp,
       totalExperience: totalExp,
-      responsibilities: parsed.responsibilities || [],
-      industry: industry,
-      projects: parsed.projects || [],
+      responsibilities: (parsed.responsibilities || []).slice(0, 10),
+      industry,
+      projects: (parsed.projects || []).slice(0, 10),
       skillRecency: parsed.skillRecency || '',
-      toolProficiency: parsed.toolProficiency || [],
+      toolProficiency: (parsed.toolProficiency || []).slice(0, 20),
       employmentStability: parsed.employmentStability || '',
       careerProgression: parsed.careerProgression || '',
       responsibilityComplexity: parsed.responsibilityComplexity || '',
-      leadership: parsed.leadership || [],
+      leadership: (parsed.leadership || []).slice(0, 10),
       educationLevel: parsed.educationLevel || '',
       educationField: parsed.educationField || '',
-      certifications: parsed.certifications || [],
+      certifications: (parsed.certifications || []).slice(0, 10),
       portfolio: parsed.portfolio || '',
-      city: city,
-      country: country,
+      city,
+      country,
       remotePreference: parsed.remotePreference || '',
       noticePeriod: parsed.noticePeriod || '',
       employmentType: parsed.employmentType || '',
-      keywords: parsed.keywords || [],
-      softSkills: parsed.softSkills || [],
-      achievements: parsed.achievements || [],
+      keywords: (parsed.keywords || []).slice(0, 30),
+      softSkills: (parsed.softSkills || []).slice(0, 15),
+      achievements: (parsed.achievements || []).slice(0, 10),
       resumeStructure: parsed.resumeStructure || '',
       languageQuality: parsed.languageQuality || ''
     };

@@ -29,14 +29,17 @@ const renderValue = (v) => {
   return <div className="text-sm text-slate-700 break-words whitespace-normal max-w-full">{String(v)}</div>;
 };
 
-const ParameterRow = ({ label, resumeValue, jobValue, matchScore }) => {
+const ParameterRow = ({ label, resumeValue, jobValue, matchScore, reason }) => {
   return (
-    <div className="grid grid-cols-4 gap-4 px-4 py-3 items-start hover:bg-slate-50 transition-colors border-b last:border-b-0">
+    <div className="grid grid-cols-5 gap-4 px-4 py-3 items-start hover:bg-slate-50 transition-colors border-b last:border-b-0">
       <div className="font-medium text-slate-900 text-sm">{label}</div>
       <div className="text-sm text-slate-700">{renderValue(resumeValue)}</div>
       <div className="text-sm text-slate-700">{renderValue(jobValue)}</div>
       <div className="flex justify-center items-start pt-1">
         <Icon score={matchScore} />
+      </div>
+      <div className="text-sm text-slate-600 break-words whitespace-normal max-w-full">
+        {reason || 'Not evaluated'}
       </div>
     </div>
   );

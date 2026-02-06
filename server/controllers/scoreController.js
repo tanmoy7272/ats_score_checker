@@ -37,10 +37,10 @@ const calculateScoreV2 = async (req, res) => {
     }
 
     // 1. extract resume features
-    const resumeFeatures = await extractStructuredFeatures(resumeText);
+    const resumeFeatures = await extractStructuredFeatures(resumeText, false);
 
     // 2. extract job features
-    const jobFeatures = await extractStructuredFeatures(jobText);
+    const jobFeatures = await extractStructuredFeatures(jobText, true);
 
     // 3. compute deterministic score
     const { finalScore: score, breakdown } = computeScore(resumeFeatures, jobFeatures);
@@ -48,7 +48,7 @@ const calculateScoreV2 = async (req, res) => {
     console.log('Score calculation complete:');
     console.log('- Score:', score);
     console.log('- Breakdown keys:', Object.keys(breakdown).length);
-    console.log('- Matched params:', Object.values(breakdown).filter(v => v === 1).length);
+    console.log('- Matched params:', Object.values(breakdown).filter(p => p.match > 0).length);
 
     // 4. generate explanation
     const explanation = await explain({ score, breakdown, resumeFeatures, jobFeatures });

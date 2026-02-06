@@ -44,20 +44,22 @@ const ParameterTable = ({ breakdown = {}, resume = {}, job = {} }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-      <div className="grid grid-cols-4 gap-0 border-b border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-sm text-slate-700">
+      <div className="grid grid-cols-5 gap-0 border-b border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-sm text-slate-700">
         <div>Parameter</div>
         <div>Resume</div>
         <div>Job</div>
         <div className="text-center">Match</div>
+        <div>Reason</div>
       </div>
       <div>
         {Object.keys(breakdown).map((key) => (
           <ParameterRow
             key={key}
             label={PARAMETER_LABELS[key] || key}
-            resumeValue={formatValue(resume?.[key])}
-            jobValue={formatValue(job?.[key])}
-            matchScore={breakdown[key] ?? 0}
+            resumeValue={formatValue(breakdown[key]?.resumeValue)}
+            jobValue={formatValue(breakdown[key]?.jobValue)}
+            matchScore={breakdown[key]?.match ?? 0}
+            reason={breakdown[key]?.reason || 'Not evaluated'}
           />
         ))}
       </div>

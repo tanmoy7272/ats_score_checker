@@ -8,7 +8,11 @@ import {
   JobFeatures 
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// In development, use empty string to leverage Vite proxy
+// In production, use full API URL from env or fallback
+const API_BASE_URL = import.meta.env.DEV 
+  ? '' 
+  : (import.meta.env.VITE_API_URL || 'http://localhost:5000');
 
 /**
  * Uploads a resume file to the server for processing.

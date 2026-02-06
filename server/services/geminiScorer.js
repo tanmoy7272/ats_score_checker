@@ -1,92 +1,79 @@
 const { matchArrays, matchArraysKeywords } = require('../utils/arrayOverlap');
 const { fuzzyTextMatch } = require('../utils/fuzzyMatch');
-const { areSynonyms } = require('../utils/synonymNormalizer');
+const { areSimilar } = require('../utils/synonymNormalizer');
 
-const VALID_TOOLS = ['git', 'github', 'gitlab', 'postman', 'vscode', 'npm', 'yarn', 'docker', 'kubernetes', 'jenkins', 'jira', 'ci/cd'];
-
-const INDUSTRY_MAP = {
-  'software': 'technology',
-  'web': 'technology',
-  'app': 'technology',
-  'development': 'technology',
-  'saas': 'technology',
-  'it': 'technology',
-  'information technology': 'technology',
-  'tech': 'technology'
+const TINY_NORM = {
+  'it': 'technology', 'tech': 'technology', 'software': 'technology',
+  'cs': 'computer', 'computer science': 'computer', 'computing': 'computer',
+  'dev': 'developer', 'developer': 'developer', 'engineer': 'developer',
+  'bachelor': 'bachelor', 'btech': 'bachelor', 'be': 'bachelor', 'bs': 'bachelor',
+  'master': 'master', 'mtech': 'master', 'ms': 'master', 'mca': 'master',
+  'web': 'web', 'frontend': 'web', 'backend': 'web', 'fullstack': 'web'
 };
 
-const TITLE_KEYWORDS = {
-  'developer': ['web developer', 'software developer', 'full stack', 'frontend', 'backend', 'engineer'],
-  'engineer': ['software engineer', 'web developer', 'developer', 'full stack'],
-  'computer': ['it', 'technology', 'software', 'computer science', 'mca', 'bca']
-};
-
-function normalizeIndustry(industry) {
-  if (!industry) return '';
-  const lower = industry.toLowerCase().trim();
-  for (const [key, normalized] of Object.entries(INDUSTRY_MAP)) {
-    if (lower.includes(key)) return normalized;
-  }
-  return lower;
+function tokenize(text) {
+  if (!text) return [];
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 1)
+    .map(w => TINY_NORM[w] || w);
 }
 
-function filterTools(tools) {
-  if (!Array.isArray(tools)) return [];
-  return tools.filter(tool => {
-    const lower = tool.toLowerCase();
-    return VALID_TOOLS.some(valid => lower.includes(valid) || valid.includes(lower)) && !lower.includes('api');
-  });
+function matchExperience(candidate, required, label) {
+  if (!required) return { match: 0, reason: 'Not required' };
+  if (candidate >= required) return { match: 1, reason: `${candidate} years (meets ${required}+ required)` };
+  if (candidate >= required * 0.6) return { match: 0.5, reason: `${candidate} years (below ${required} required)` };
+  return { match: 0, reason: `${candidate} years (below ${required} required)` };
 }
 
-function lenientTextMatch(text1, text2, keywords) {
-  if (!text1 || !text2) return 0;
-  const t1 = text1.toLowerCase().trim();
-  const t2 = text2.toLowerCase().trim();
+function matchText(resumeValue, jobValue, label) {
+  if (!jobValue || !resumeValue) return { match: 0, reason: 'No data provided' };
   
-  if (t1 === t2) return 1;
-  if (t1.includes(t2) || t2.includes(t1)) return 1;
+  const rTokens = tokenize(resumeValue);
+  const jTokens = tokenize(jobValue);
   
-  if (keywords) {
-    for (const [key, similar] of Object.entries(keywords)) {
-      const in1 = t1.includes(key) || similar.some(s => t1.includes(s));
-      const in2 = t2.includes(key) || similar.some(s => t2.includes(s));
-      if (in1 && in2) return 1;
-    }
-  }
+  if (rTokens.length === 0 || jTokens.length === 0) return { match: 0, reason: 'No data provided' };
   
-  const fuzzy = fuzzyTextMatch(t1, t2);
-  return fuzzy >= 0.4 ? (fuzzy >= 0.7 ? 1 : 0.5) : 0;
+  const rSet = new Set(rTokens);
+  const overlap = jTokens.filter(t => rSet.has(t)).length;
+  const ratio = overlap / jTokens.length;
+  
+  if (ratio >= 0.5) return { match: 1, reason: 'Strong overlap' };
+  if (ratio >= 0.2 || overlap > 0) return { match: 0.5, reason: 'Partial overlap' };
+  
+  return { match: 0, reason: 'Different field' };
 }
 
-function computeSkillCoverage(resumeSkills, jobSkills) {
-  const resume = [...(resumeSkills.coreSkills || []), ...(resumeSkills.secondarySkills || [])];
-  const job = [...(jobSkills.coreSkills || []), ...(jobSkills.secondarySkills || [])];
-  
-  if (job.length === 0) return 0;
-  
-  const resumeSet = new Set(resume.map(s => s.toLowerCase().trim()));
-  const intersection = job.filter(skill => resumeSet.has(skill.toLowerCase().trim()));
-  const ratio = intersection.length / job.length;
-  
-  if (ratio >= 0.6) return 1;
-  if (ratio >= 0.3) return 0.5;
-  return 0;
+function matchBoolean(value, label) {
+  if (value) return { match: 1, reason: 'Provided' };
+  return { match: 0, reason: 'Not provided' };
 }
 
-/**
- * Simple deterministic matcher - no AI scoring
- * Returns 0, 0.5, or 1 for each parameter
- */
+function matchQuality(value, positiveKeywords) {
+  if (!value) return { match: 0, reason: 'Not detected' };
+  const lower = value.toLowerCase();
+  const isPositive = positiveKeywords.some(kw => lower.includes(kw));
+  if (isPositive) return { match: 1, reason: value };
+  return { match: 0, reason: value };
+}
+
+function computeSkillCoverage(resumeFeatures, jobFeatures) {
+  const resume = [...(resumeFeatures.coreSkills || []), ...(resumeFeatures.secondarySkills || [])];
+  const job = [...(jobFeatures.coreSkills || []), ...(jobFeatures.secondarySkills || [])];
+  
+  if (job.length === 0) return { match: 0, reason: 'No skills required' };
+  
+  return matchArrays(job, resume);
+}
+
 function getParameterMatches(resumeFeatures, jobFeatures) {
   const matches = {};
   
-  const resumeTools = filterTools(resumeFeatures.tools || []);
-  const jobTools = filterTools(jobFeatures.tools || []);
-  
-  // Arrays - use overlap ratio
   matches.coreSkills = matchArrays(jobFeatures.coreSkills || [], resumeFeatures.coreSkills || []);
   matches.secondarySkills = matchArrays(jobFeatures.secondarySkills || [], resumeFeatures.secondarySkills || []);
-  matches.tools = matchArrays(jobTools, resumeTools);
+  matches.tools = matchArrays(jobFeatures.tools || [], resumeFeatures.tools || []);
   matches.responsibilities = matchArraysKeywords(jobFeatures.responsibilities || [], resumeFeatures.responsibilities || []);
   matches.keywords = matchArrays(jobFeatures.keywords || [], resumeFeatures.keywords || []);
   matches.softSkills = matchArrays(jobFeatures.softSkills || [], resumeFeatures.softSkills || []);
@@ -95,121 +82,46 @@ function getParameterMatches(resumeFeatures, jobFeatures) {
   matches.toolProficiency = matchArrays(jobFeatures.toolProficiency || [], resumeFeatures.toolProficiency || []);
   matches.achievements = matchArrays(jobFeatures.achievements || [], resumeFeatures.achievements || []);
   
-  // Numbers - experience
-  const reqRelevant = jobFeatures.relevantExperience || 0;
-  const candRelevant = resumeFeatures.relevantExperience || 0;
-  if (!reqRelevant) {
-    matches.relevantExperience = 0;
-  } else if (candRelevant >= reqRelevant) {
-    matches.relevantExperience = 1;
-  } else if (candRelevant >= reqRelevant * 0.7) {
-    matches.relevantExperience = 0.5;
+  matches.relevantExperience = matchExperience(
+    resumeFeatures.relevantExperience || 0,
+    jobFeatures.relevantExperience || 0,
+    'Relevant Experience'
+  );
+  
+  matches.totalExperience = matchExperience(
+    resumeFeatures.totalExperience || 0,
+    jobFeatures.totalExperience || 0,
+    'Total Experience'
+  );
+  
+  matches.title = matchText(resumeFeatures.title, jobFeatures.title, 'Title');
+  matches.industry = matchText(resumeFeatures.industry, jobFeatures.industry, 'Industry');
+  matches.educationLevel = matchText(resumeFeatures.educationLevel, jobFeatures.educationLevel, 'Education Level');
+  matches.educationField = matchText(resumeFeatures.educationField, jobFeatures.educationField, 'Education Field');
+  
+  matches.city = matchText(resumeFeatures.city, jobFeatures.city, 'City');
+  matches.country = matchText(resumeFeatures.country, jobFeatures.country, 'Country');
+  matches.remotePreference = matchText(resumeFeatures.remotePreference, jobFeatures.remotePreference, 'Remote Preference');
+  matches.employmentType = matchText(resumeFeatures.employmentType, jobFeatures.employmentType, 'Employment Type');
+  
+  const hasProjects = (resumeFeatures.projects && resumeFeatures.projects.length > 0);
+  if (hasProjects) {
+    matches.projectRelevance = { match: 1, reason: `${resumeFeatures.projects.length} projects listed` };
   } else {
-    matches.relevantExperience = 0;
+    matches.projectRelevance = { match: 0, reason: 'No projects listed' };
   }
   
-  const reqTotal = jobFeatures.totalExperience || 0;
-  const candTotal = resumeFeatures.totalExperience || 0;
-  if (!reqTotal) {
-    matches.totalExperience = 0;
-  } else if (candTotal >= reqTotal) {
-    matches.totalExperience = 1;
-  } else if (candTotal >= reqTotal * 0.7) {
-    matches.totalExperience = 0.5;
-  } else {
-    matches.totalExperience = 0;
-  }
+  matches.portfolio = matchBoolean(resumeFeatures.portfolio, 'Portfolio');
+  matches.noticePeriod = matchBoolean(resumeFeatures.noticePeriod, 'Notice Period');
   
-  // Text - use lenient matching
-  matches.title = lenientTextMatch(resumeFeatures.title, jobFeatures.title, TITLE_KEYWORDS);
-  
-  const resumeInd = normalizeIndustry(resumeFeatures.industry);
-  const jobInd = normalizeIndustry(jobFeatures.industry);
-  if (!jobInd || !resumeInd) {
-    matches.industry = 0;
-  } else if (resumeInd === jobInd) {
-    matches.industry = 1;
-  } else {
-    matches.industry = lenientTextMatch(resumeInd, jobInd);
-  }
-  
-  matches.educationLevel = lenientTextMatch(resumeFeatures.educationLevel, jobFeatures.educationLevel, TITLE_KEYWORDS);
-  matches.educationField = lenientTextMatch(resumeFeatures.educationField, jobFeatures.educationField, TITLE_KEYWORDS);
-  
-  // Location
-  const jobCity = jobFeatures.city || '';
-  const resumeCity = resumeFeatures.city || '';
-  if (!jobCity || !resumeCity) {
-    matches.city = 0;
-  } else {
-    matches.city = fuzzyTextMatch(jobCity, resumeCity);
-  }
-  
-  const jobCountry = jobFeatures.country || '';
-  const resumeCountry = resumeFeatures.country || '';
-  if (!jobCountry || !resumeCountry) {
-    matches.country = 0;
-  } else {
-    matches.country = fuzzyTextMatch(jobCountry, resumeCountry);
-  }
-  
-  // Direct text comparison
-  const jobRemote = jobFeatures.remotePreference || '';
-  const resumeRemote = resumeFeatures.remotePreference || '';
-  if (!jobRemote || !resumeRemote) {
-    matches.remotePreference = 0;
-  } else {
-    matches.remotePreference = fuzzyTextMatch(jobRemote, resumeRemote);
-  }
-  
-  const jobEmpType = jobFeatures.employmentType || '';
-  const resumeEmpType = resumeFeatures.employmentType || '';
-  if (!jobEmpType || !resumeEmpType) {
-    matches.employmentType = 0;
-  } else {
-    matches.employmentType = fuzzyTextMatch(jobEmpType, resumeEmpType);
-  }
-  
-  // Quality indicators - lenient presence check
-  const hasProjects = (resumeFeatures.projects && resumeFeatures.projects.length > 0) || 
-                     (resumeFeatures.achievements && resumeFeatures.achievements.length > 0);
-  const isDev = (jobFeatures.title || '').toLowerCase().includes('developer') || 
-                (jobFeatures.title || '').toLowerCase().includes('engineer');
-  
-  if (hasProjects && isDev) {
-    matches.projectRelevance = 0.5;
-  } else if (hasProjects) {
-    matches.projectRelevance = 1;
-  } else {
-    matches.projectRelevance = 0;
-  }
-  
-  matches.portfolio = resumeFeatures.portfolio ? 1 : 0;
-  
-  // Skill coverage - always compute
   matches.skillCoverage = computeSkillCoverage(resumeFeatures, jobFeatures);
   
-  // Quality assessments
-  const skillRecency = resumeFeatures.skillRecency || '';
-  matches.skillRecency = skillRecency.toLowerCase().includes('current') || skillRecency.toLowerCase().includes('recent') ? 1 : 0;
-  
-  const stability = resumeFeatures.employmentStability || '';
-  matches.employmentStability = stability.toLowerCase().includes('stable') ? 1 : 0;
-  
-  const progression = resumeFeatures.careerProgression || '';
-  matches.careerProgression = progression.toLowerCase().includes('growing') ? 1 : 0;
-  
-  const complexity = resumeFeatures.responsibilityComplexity || '';
-  matches.responsibilityComplexity = complexity.toLowerCase().includes('high') ? 1 : 0;
-  
-  const structure = resumeFeatures.resumeStructure || '';
-  matches.resumeStructure = structure.toLowerCase().includes('well') ? 1 : 0;
-  
-  const language = resumeFeatures.languageQuality || '';
-  matches.languageQuality = language.toLowerCase().includes('excellent') || language.toLowerCase().includes('good') ? 1 : 0;
-  
-  // Notice period - simple presence check
-  matches.noticePeriod = resumeFeatures.noticePeriod ? 1 : 0;
+  matches.skillRecency = matchQuality(resumeFeatures.skillRecency, ['current', 'recent']);
+  matches.employmentStability = matchQuality(resumeFeatures.employmentStability, ['stable']);
+  matches.careerProgression = matchQuality(resumeFeatures.careerProgression, ['growing']);
+  matches.responsibilityComplexity = matchQuality(resumeFeatures.responsibilityComplexity, ['high']);
+  matches.resumeStructure = matchQuality(resumeFeatures.resumeStructure, ['well']);
+  matches.languageQuality = matchQuality(resumeFeatures.languageQuality, ['excellent', 'good']);
   
   return matches;
 }
