@@ -6,33 +6,60 @@ const { computeScore } = require('../services/scoreEngine');
 const analysisCache = new Map();
 const MAX_CACHE_ENTRIES = 200;
 
-function toLabel(key) {
-  return String(key)
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
 function generateInsights(breakdown) {
-  const weak = [];
-  const strong = [];
+  const insights = [];
+  const improvements = [];
 
-  for (const [key, v] of Object.entries(breakdown || {})) {
-    const score = v && typeof v.match === 'number' ? v.match : 0;
-    if (score === 1) strong.push(key);
-    if (score === 0) weak.push(key);
+  const getScore = key => {
+    const value = breakdown && breakdown[key];
+    return value && typeof value.match === 'number' ? value.match : 0;
+  };
+
+  const hasGap = key => getScore(key) === 0;
+  const partial = key => getScore(key) === 0.5;
+  const good = key => getScore(key) === 1;
+
+  // Strengths
+  if (good('coreSkills') || good('tools')) {
+    insights.push('Strong alignment with required technologies and tools');
   }
 
-  const strongList = strong.slice(0, 5);
-  const weakList = weak.slice(0, 6);
+  if (good('relevantExperience') || good('totalExperience')) {
+    insights.push('Experience level meets or exceeds requirements');
+  }
+
+  if (good('projectRelevance') || good('portfolio')) {
+    insights.push('Practical project experience demonstrated');
+  }
+
+  if (good('industry') || good('title')) {
+    insights.push('Role and domain background closely match the position');
+  }
+
+  // Gaps
+  if (hasGap('coreSkills') || partial('coreSkills')) {
+    improvements.push('Add more of the required technical skills mentioned in the job');
+  }
+
+  if (hasGap('relevantExperience')) {
+    improvements.push('Highlight more relevant hands-on experience');
+  }
+
+  if (hasGap('projectRelevance')) {
+    improvements.push('Include project examples or portfolio links');
+  }
+
+  if (hasGap('keywords')) {
+    improvements.push('Align resume wording more closely with job description terminology');
+  }
+
+  if (hasGap('city') || hasGap('country') || hasGap('remotePreference')) {
+    improvements.push('Clarify location or remote availability');
+  }
 
   return {
-    why: [
-      `Strong alignment in ${strongList.join(', ')}`,
-      `${weak.length} areas need improvement`
-    ],
-    improve: weakList.map(k => `Improve ${toLabel(k)}`)
+    why: insights.slice(0, 5),
+    improve: improvements.slice(0, 5)
   };
 }
 
