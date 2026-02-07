@@ -15,7 +15,7 @@ function cleanForAI(text) {
       return !bad.some(b => line.includes(b));
     })
     .join(' ')
-    .slice(0, 6000);
+    .slice(0, 8000);
 }
 
 module.exports = { cleanForAI };

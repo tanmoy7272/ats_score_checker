@@ -111,10 +111,30 @@ function safeNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
+function compressText(text) {
+  return String(text || '')
+    .replace(/\s+/g, ' ')
+    .slice(0, 6000);
+}
+
 function buildSafeText(text) {
   const cleaned = cleanForAI(text);
-  if (cleaned) return cleaned;
-  return String(text || '').slice(0, 6000);
+  if (cleaned) return compressText(cleaned);
+  return compressText(text);
+}
+
+function extractProjectsFallback(text) {
+  const projectKeywords = [
+    'built', 'developed', 'implemented', 'created',
+    'engineered', 'designed', 'architected', 'launched'
+  ];
+
+  return String(text || '')
+    .split('.')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .filter(line => projectKeywords.some(k => line.toLowerCase().includes(k)))
+    .slice(0, 5);
 }
 
 function normalizeFeatures(parsed, originalText) {
@@ -145,6 +165,12 @@ function normalizeFeatures(parsed, originalText) {
     country = CITY_COUNTRY_MAP[cityLower] || '';
   }
 
+  const projects = safeArray(parsed.projects).slice(0, 10);
+  const fallbackProjects = extractProjectsFallback(originalText);
+  const resolvedProjects = projects.length > 0
+    ? projects
+    : (fallbackProjects.length > 0 ? fallbackProjects : ['General development experience detected']);
+
   return {
     coreSkills: safeArray(parsed.coreSkills).slice(0, 30),
     secondarySkills: safeArray(parsed.secondarySkills).slice(0, 30),
@@ -154,7 +180,7 @@ function normalizeFeatures(parsed, originalText) {
     totalExperience: totalExp,
     responsibilities: safeArray(parsed.responsibilities).slice(0, 10),
     industry,
-    projects: safeArray(parsed.projects).slice(0, 10),
+    projects: resolvedProjects,
     skillRecency: safeString(parsed.skillRecency),
     toolProficiency: safeArray(parsed.toolProficiency).slice(0, 20),
     employmentStability: safeString(parsed.employmentStability),

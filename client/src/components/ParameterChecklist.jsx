@@ -35,11 +35,17 @@ const PARAMETER_LABELS = {
 };
 
 const ParameterChecklist = ({ breakdown = {}, resume = {}, job = {} }) => {
+  const summarize = (arr) => {
+    if (!arr || arr.length === 0) return 'N/A';
+    if (arr.length <= 3) return arr.join(', ');
+    return `${arr.slice(0, 3).join(', ')} +${arr.length - 3} more`;
+  };
+
   const formatValue = (value) => {
-    if (value === null || value === undefined || value === '') return 'Not detected';
-    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : 'Not detected';
+    if (value === null || value === undefined || value === '' || value === 'Not detected' || value === 'N/A') return 'N/A';
+    if (Array.isArray(value)) return summarize(value);
     if (typeof value === 'number') return value.toString();
-    return value || 'Not detected';
+    return value || 'N/A';
   };
 
   return (

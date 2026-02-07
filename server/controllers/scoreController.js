@@ -2,10 +2,39 @@
 const crypto = require('crypto');
 const { extractStructuredFeaturesPair } = require('../services/geminiExtractor');
 const { computeScore } = require('../services/scoreEngine');
-const { explain } = require('../services/geminiExplainer');
 
 const analysisCache = new Map();
 const MAX_CACHE_ENTRIES = 200;
+
+function toLabel(key) {
+  return String(key)
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function generateInsights(breakdown) {
+  const weak = [];
+  const strong = [];
+
+  for (const [key, v] of Object.entries(breakdown || {})) {
+    const score = v && typeof v.match === 'number' ? v.match : 0;
+    if (score === 1) strong.push(key);
+    if (score === 0) weak.push(key);
+  }
+
+  const strongList = strong.slice(0, 5);
+  const weakList = weak.slice(0, 6);
+
+  return {
+    why: [
+      `Strong alignment in ${strongList.join(', ')}`,
+      `${weak.length} areas need improvement`
+    ],
+    improve: weakList.map(k => `Improve ${toLabel(k)}`)
+  };
+}
 
 function getCacheKey(resumeText, jobText) {
   const hash = crypto.createHash('sha256');
@@ -65,15 +94,14 @@ const calculateScoreV2 = async (req, res) => {
     console.timeEnd('analysis');
 
     // 4. generate explanation
-    const explanation = await explain({ score, breakdown, resumeFeatures, jobFeatures });
-
+    const insights = generateInsights(breakdown);
     const response = {
       score,
       breakdown,
       resumeFeatures,
       jobFeatures,
-      reasons: explanation.reasons || [],
-      improvements: explanation.improvements || []
+      reasons: insights.why,
+      improvements: insights.improve
     };
 
     if (analysisCache.size >= MAX_CACHE_ENTRIES) {

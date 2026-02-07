@@ -28,21 +28,23 @@ const isProjectLike = (label) => {
 };
 
 const formatArraySummary = (arr) => {
-  if (!arr || arr.length === 0) return 'Not detected';
-  if (arr.length <= 4) return arr.join(', ');
+  if (!arr || arr.length === 0) return 'N/A';
+  if (arr.length <= 3) return arr.join(', ');
   const head = arr.slice(0, 3).join(', ');
   return `${head} +${arr.length - 3} more`;
 };
 
 const renderSummary = (value, label) => {
-  if (value === undefined || value === null || value === '' || value === 'Not detected') {
-    return <span className="text-slate-400 text-sm">Not detected</span>;
+  if (value === undefined || value === null || value === '' || value === 'Not detected' || value === 'N/A') {
+    return <span className="text-slate-400 text-sm">N/A</span>;
   }
 
   if (Array.isArray(value)) {
     if (isResponsibilitiesLike(label)) {
-      return (
+      return value.length > 0 ? (
         <span className="text-slate-600 text-sm">{value.length} items detected</span>
+      ) : (
+        <span className="text-slate-400 text-sm">N/A</span>
       );
     }
 
@@ -50,7 +52,7 @@ const renderSummary = (value, label) => {
       return value.length > 0 ? (
         <span className="text-slate-600 text-sm">{value.length} items</span>
       ) : (
-        <span className="text-slate-400 text-sm">Not detected</span>
+        <span className="text-slate-400 text-sm">N/A</span>
       );
     }
 
@@ -77,7 +79,7 @@ const renderSummary = (value, label) => {
     return value ? (
       <span className="text-slate-600 text-sm">Provided</span>
     ) : (
-      <span className="text-slate-400 text-sm">Not detected</span>
+      <span className="text-slate-400 text-sm">N/A</span>
     );
   }
 
@@ -89,7 +91,7 @@ const renderSummary = (value, label) => {
 };
 
 const renderDetails = (value) => {
-  if (value === undefined || value === null || value === '' || value === 'Not detected') {
+  if (value === undefined || value === null || value === '' || value === 'Not detected' || value === 'N/A') {
     return null;
   }
 
@@ -147,13 +149,13 @@ const ParameterRow = ({ label, resumeValue, jobValue, matchScore, reason }) => {
             {showDetails ? 'Hide details' : 'View details'}
           </button>
           {showDetails && (
-            <div className="mt-2 grid grid-cols-2 gap-4 min-w-0">
+            <div className="mt-3 grid grid-cols-2 gap-4 min-w-0 bg-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm">
               <div className="min-w-0 break-words whitespace-normal">
-                <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Resume</div>
+                <div className="text-sm font-semibold text-gray-700 mb-2">Resume</div>
                 {renderDetails(resumeValue)}
               </div>
               <div className="min-w-0 break-words whitespace-normal">
-                <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Job</div>
+                <div className="text-sm font-semibold text-gray-700 mb-2">Job</div>
                 {renderDetails(jobValue)}
               </div>
             </div>
