@@ -1,5 +1,5 @@
 const { AIClient } = require('./aiClient');
-const { preCleanText } = require('../utils/preCleanText');
+const { cleanForAI } = require('../utils/cleanForAI');
 
 const INVALID_TOOL_KEYWORDS = ['api', 'weather', 'map', 'locationiq', 'openmeteo', 'usgs', 'service'];
 
@@ -44,8 +44,8 @@ const FEATURE_SCHEMA = `{
   "languageQuality": "Excellent|Good|Fair|"
 }`;
 
-const PROMPT_SINGLE = `Extract structured ATS hiring features into JSON. Follow schema exactly. No explanation. Fill all fields; use [] or "" or 0 if unknown. Do not output "Not detected".\n${FEATURE_SCHEMA}`;
-const PROMPT_PAIR = `Extract structured ATS hiring features into JSON. Follow schema exactly. No explanation. Fill all fields; use [] or "" or 0 if unknown. Do not output "Not detected".\n{\n  "resume": ${FEATURE_SCHEMA},\n  "job": ${FEATURE_SCHEMA}\n}`;
+const PROMPT_SINGLE = `Extract ATS hiring features into strict JSON. Follow schema exactly. Return JSON only.\n${FEATURE_SCHEMA}`;
+const PROMPT_PAIR = `Extract ATS hiring features into strict JSON. Follow schema exactly. Return JSON only.\n{\n  "resume": ${FEATURE_SCHEMA},\n  "job": ${FEATURE_SCHEMA}\n}`;
 
 const EMPTY_FEATURES = {
   coreSkills: [],
@@ -99,10 +99,6 @@ function parseJsonFromText(text) {
   }
 }
 
-function safeField(value, fallback) {
-  return value === undefined || value === null ? fallback : value;
-}
-
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -113,6 +109,12 @@ function safeString(value) {
 
 function safeNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function buildSafeText(text) {
+  const cleaned = cleanForAI(text);
+  if (cleaned) return cleaned;
+  return String(text || '').slice(0, 6000);
 }
 
 function normalizeFeatures(parsed, originalText) {
@@ -182,8 +184,7 @@ async function extractStructuredFeatures(text, isJD = false) {
   }
 
   try {
-    const cleaned = preCleanText(text);
-    const safeText = (cleaned || text).slice(0, 10000);
+    const safeText = buildSafeText(text);
 
     const aiClient = new AIClient();
     const prompt = `${PROMPT_SINGLE}\n\nText:\n${safeText}`;
@@ -199,16 +200,13 @@ async function extractStructuredFeatures(text, isJD = false) {
 }
 
 async function extractStructuredFeaturesPair(resumeText, jobText) {
-  if (!resumeText || !jobText) {
+  if (!resumeText && !jobText) {
     return { resumeFeatures: { ...EMPTY_FEATURES }, jobFeatures: { ...EMPTY_FEATURES } };
   }
 
   try {
-    const cleanedResume = preCleanText(resumeText);
-    const cleanedJob = preCleanText(jobText);
-
-    const resumeInput = (cleanedResume || resumeText).slice(0, 10000);
-    const jobInput = (cleanedJob || jobText).slice(0, 10000);
+    const resumeInput = buildSafeText(resumeText);
+    const jobInput = buildSafeText(jobText);
 
     const aiClient = new AIClient();
     const prompt = `${PROMPT_PAIR}\n\nResume:\n${resumeInput}\n\nJob:\n${jobInput}`;

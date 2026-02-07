@@ -1,5 +1,9 @@
 const { matchArrays, matchArraysKeywords, matchArraysTokenized } = require('../utils/arrayOverlap');
 const { normalizeTokens } = require('../utils/normalizeTokens');
+const { normalizeIndustry } = require('../utils/normalizeIndustry');
+const { computeSkillCoverage } = require('../utils/computeSkillCoverage');
+const { stripProficiency } = require('../utils/stripProficiency');
+const { stemToken } = require('../utils/stemToken');
 const { fuzzyTextMatch } = require('../utils/fuzzyMatch');
 const { areSimilar } = require('../utils/synonymNormalizer');
 
@@ -31,6 +35,14 @@ function matchExperience(candidate, required, label) {
 
 function matchText(resumeValue, jobValue, label) {
   if (!jobValue || !resumeValue) return { match: 0, reason: 'No data provided' };
+
+  if (label === 'Industry') {
+    const resumeIndustry = normalizeIndustry(resumeValue);
+    const jobIndustry = normalizeIndustry(jobValue);
+    if (resumeIndustry && resumeIndustry === jobIndustry) {
+      return { match: 1, reason: 'Industry match' };
+    }
+  }
 
   const resumeTokens = normalizeTokens([resumeValue]);
   const jobTokens = normalizeTokens([jobValue]);
@@ -65,13 +77,36 @@ function matchQuality(value, positiveKeywords) {
   return { match: 0, reason: value };
 }
 
-function computeSkillCoverage(resumeFeatures, jobFeatures) {
-  const resume = [...(resumeFeatures.coreSkills || []), ...(resumeFeatures.secondarySkills || [])];
-  const job = [...(jobFeatures.coreSkills || []), ...(jobFeatures.secondarySkills || [])];
-  
-  if (job.length === 0) return { match: 0, reason: 'No skills required' };
-  
-  return matchArrays(job, resume);
+function normalizeSoftSkillTokens(values) {
+  const tokens = normalizeTokens(values || []);
+  const stemmed = tokens.map(stemToken).filter(Boolean);
+  return [...new Set(stemmed)];
+}
+
+function matchSoftSkills(required, candidate) {
+  if (!required || !candidate || required.length === 0 || candidate.length === 0) {
+    return { match: 0, reason: 'No data provided' };
+  }
+
+  const requiredTokens = normalizeSoftSkillTokens(required);
+  const candidateTokens = normalizeSoftSkillTokens(candidate);
+
+  if (requiredTokens.length === 0 || candidateTokens.length === 0) {
+    return { match: 0, reason: 'No data provided' };
+  }
+
+  const requiredSet = new Set(requiredTokens);
+  const candidateSet = new Set(candidateTokens);
+
+  const intersection = new Set([...requiredSet].filter(t => candidateSet.has(t)));
+  const matched = intersection.size;
+  const total = requiredSet.size;
+  const ratio = total === 0 ? 0 : matched / total;
+
+  if (ratio >= 0.6) return { match: 1, reason: `Strong match (${matched}/${total})` };
+  if (ratio >= 0.3) return { match: 0.5, reason: `Partial match (${matched}/${total})` };
+
+  return { match: 0, reason: `Low overlap (${matched}/${total})` };
 }
 
 function getParameterMatches(resumeFeatures, jobFeatures) {
@@ -82,10 +117,12 @@ function getParameterMatches(resumeFeatures, jobFeatures) {
   matches.tools = matchArraysTokenized(jobFeatures.tools || [], resumeFeatures.tools || []);
   matches.responsibilities = matchArraysTokenized(jobFeatures.responsibilities || [], resumeFeatures.responsibilities || []);
   matches.keywords = matchArraysTokenized(jobFeatures.keywords || [], resumeFeatures.keywords || []);
-  matches.softSkills = matchArrays(jobFeatures.softSkills || [], resumeFeatures.softSkills || []);
+  matches.softSkills = matchSoftSkills(jobFeatures.softSkills || [], resumeFeatures.softSkills || []);
   matches.certifications = matchArrays(jobFeatures.certifications || [], resumeFeatures.certifications || []);
   matches.leadership = matchArrays(jobFeatures.leadership || [], resumeFeatures.leadership || []);
-  matches.toolProficiency = matchArrays(jobFeatures.toolProficiency || [], resumeFeatures.toolProficiency || []);
+  const resumeTools = (resumeFeatures.toolProficiency || []).map(stripProficiency);
+  const jobTools = (jobFeatures.toolProficiency || []).map(stripProficiency);
+  matches.toolProficiency = matchArraysTokenized(jobTools, resumeTools);
   matches.achievements = matchArrays(jobFeatures.achievements || [], resumeFeatures.achievements || []);
   
   matches.relevantExperience = matchExperience(
@@ -120,7 +157,10 @@ function getParameterMatches(resumeFeatures, jobFeatures) {
   matches.portfolio = matchBoolean(resumeFeatures.portfolio, 'Portfolio');
   matches.noticePeriod = matchBoolean(resumeFeatures.noticePeriod, 'Notice Period');
   
-  matches.skillCoverage = computeSkillCoverage(resumeFeatures, jobFeatures);
+  matches.skillCoverage = computeSkillCoverage(
+    [...(resumeFeatures.coreSkills || []), ...(resumeFeatures.secondarySkills || [])],
+    [...(jobFeatures.coreSkills || []), ...(jobFeatures.secondarySkills || [])]
+  );
   
   matches.skillRecency = matchQuality(resumeFeatures.skillRecency, ['current', 'recent']);
   matches.employmentStability = matchQuality(resumeFeatures.employmentStability, ['stable']);

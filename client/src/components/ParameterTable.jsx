@@ -35,29 +35,22 @@ const PARAMETER_LABELS = {
 };
 
 const ParameterTable = ({ breakdown = {}, resume = {}, job = {} }) => {
-  const formatValue = (value) => {
-    if (value === null || value === undefined || value === '') return 'Not detected';
-    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : 'Not detected';
-    if (typeof value === 'number') return value.toString();
-    return value || 'Not detected';
-  };
-
   return (
     <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-      <div className="grid grid-cols-5 gap-0 border-b border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-sm text-slate-700">
-        <div>Parameter</div>
-        <div>Resume</div>
-        <div>Job</div>
-        <div className="text-center">Match</div>
-        <div>Reason</div>
+      <div className="grid grid-cols-[180px_2fr_2fr_80px_220px] gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-sm text-slate-700 items-start">
+        <div className="min-w-0 break-words whitespace-normal">Parameter</div>
+        <div className="min-w-0 break-words whitespace-normal">Resume</div>
+        <div className="min-w-0 break-words whitespace-normal">Job</div>
+        <div className="w-[80px] shrink-0 text-center flex justify-center items-center">Match</div>
+        <div className="min-w-0 break-words whitespace-normal">Reason</div>
       </div>
       <div>
         {Object.keys(breakdown).map((key) => (
           <ParameterRow
             key={key}
             label={PARAMETER_LABELS[key] || key}
-            resumeValue={formatValue(breakdown[key]?.resumeValue)}
-            jobValue={formatValue(breakdown[key]?.jobValue)}
+            resumeValue={breakdown[key]?.resumeValue}
+            jobValue={breakdown[key]?.jobValue}
             matchScore={breakdown[key]?.match ?? 0}
             reason={breakdown[key]?.reason || 'Not evaluated'}
           />

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 
 const Icon = ({ score }) => {
   if (score === 1) {
@@ -10,37 +10,156 @@ const Icon = ({ score }) => {
   return <svg className="w-5 h-5 text-rose-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>;
 };
 
-const renderValue = (v) => {
-  if (v === undefined || v === null || v === '' || v === 'Not detected') {
+const normalizeLabel = (label) => String(label || '').toLowerCase();
+
+const isSkillLike = (label) => {
+  const l = normalizeLabel(label);
+  return l.includes('skill') || l.includes('tools') || l.includes('keywords');
+};
+
+const isResponsibilitiesLike = (label) => {
+  const l = normalizeLabel(label);
+  return l.includes('responsibilit') || l.includes('achievement');
+};
+
+const isProjectLike = (label) => {
+  const l = normalizeLabel(label);
+  return l.includes('project') || l.includes('certification') || l.includes('portfolio');
+};
+
+const formatArraySummary = (arr) => {
+  if (!arr || arr.length === 0) return 'Not detected';
+  if (arr.length <= 4) return arr.join(', ');
+  const head = arr.slice(0, 3).join(', ');
+  return `${head} +${arr.length - 3} more`;
+};
+
+const renderSummary = (value, label) => {
+  if (value === undefined || value === null || value === '' || value === 'Not detected') {
     return <span className="text-slate-400 text-sm">Not detected</span>;
   }
-  
-  if (Array.isArray(v)) {
-    if (v.length === 0) return <span className="text-slate-400 text-sm">Not detected</span>;
+
+  if (Array.isArray(value)) {
+    if (isResponsibilitiesLike(label)) {
+      return (
+        <span className="text-slate-600 text-sm">{value.length} items detected</span>
+      );
+    }
+
+    if (isProjectLike(label)) {
+      return value.length > 0 ? (
+        <span className="text-slate-600 text-sm">{value.length} items</span>
+      ) : (
+        <span className="text-slate-400 text-sm">Not detected</span>
+      );
+    }
+
+    if (isSkillLike(label)) {
+      return (
+        <span className="text-slate-700 text-sm min-w-0 break-words whitespace-normal">
+          {formatArraySummary(value)}
+        </span>
+      );
+    }
+
     return (
-      <div className="flex flex-wrap gap-2 max-w-full">
-        {v.map((x, i) => (
-          <span key={i} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs border border-slate-200 break-words whitespace-normal">{x}</span>
+      <span className="text-slate-700 text-sm min-w-0 break-words whitespace-normal">
+        {formatArraySummary(value)}
+      </span>
+    );
+  }
+
+  if (typeof value === 'number') {
+    return <span className="text-slate-700 text-sm">{value}</span>;
+  }
+
+  if (isProjectLike(label)) {
+    return value ? (
+      <span className="text-slate-600 text-sm">Provided</span>
+    ) : (
+      <span className="text-slate-400 text-sm">Not detected</span>
+    );
+  }
+
+  return (
+    <span className="text-slate-700 text-sm min-w-0 break-words whitespace-normal">
+      {String(value)}
+    </span>
+  );
+};
+
+const renderDetails = (value) => {
+  if (value === undefined || value === null || value === '' || value === 'Not detected') {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return null;
+    return (
+      <div className="flex flex-wrap items-start gap-2 w-full min-w-0 max-w-full">
+        {value.map((item, idx) => (
+          <span key={idx} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-sm border border-slate-200 max-w-full break-words whitespace-normal">{item}</span>
         ))}
       </div>
     );
   }
-  
-  return <div className="text-sm text-slate-700 break-words whitespace-normal max-w-full">{String(v)}</div>;
+
+  return <div className="text-sm text-slate-700 break-words whitespace-normal">{String(value)}</div>;
 };
 
 const ParameterRow = ({ label, resumeValue, jobValue, matchScore, reason }) => {
+  const [showDetails, setShowDetails] = useState(false);
+
+  const hasDetails = useMemo(() => {
+    if (Array.isArray(resumeValue)) return resumeValue.length > 0;
+    if (Array.isArray(jobValue)) return jobValue.length > 0;
+    return Boolean(resumeValue || jobValue);
+  }, [resumeValue, jobValue]);
+
   return (
-    <div className="grid grid-cols-5 gap-4 px-4 py-3 items-start hover:bg-slate-50 transition-colors border-b last:border-b-0">
-      <div className="font-medium text-slate-900 text-sm">{label}</div>
-      <div className="text-sm text-slate-700">{renderValue(resumeValue)}</div>
-      <div className="text-sm text-slate-700">{renderValue(jobValue)}</div>
-      <div className="flex justify-center items-start pt-1">
-        <Icon score={matchScore} />
+    <div className="border-b last:border-b-0">
+      <div className="grid grid-cols-[180px_2fr_2fr_80px_220px] gap-4 px-4 py-3 items-start hover:bg-slate-50 transition-colors">
+        <div className="font-medium text-slate-900 text-sm min-w-0 break-words whitespace-normal">{label}</div>
+        <div className="text-sm text-slate-700 min-w-0 break-words whitespace-normal">
+          <div className="w-full break-words whitespace-normal leading-relaxed">
+            {renderSummary(resumeValue, label)}
+          </div>
+        </div>
+        <div className="text-sm text-slate-700 min-w-0 break-words whitespace-normal">
+          <div className="w-full break-words whitespace-normal leading-relaxed">
+            {renderSummary(jobValue, label)}
+          </div>
+        </div>
+        <div className="w-[80px] shrink-0 text-center flex justify-center items-center">
+          <Icon score={matchScore} />
+        </div>
+        <div className="text-sm text-slate-600 min-w-0 break-words whitespace-normal">
+          {reason || 'Not evaluated'}
+        </div>
       </div>
-      <div className="text-sm text-slate-600 break-words whitespace-normal max-w-full">
-        {reason || 'Not evaluated'}
-      </div>
+      {hasDetails && (
+        <div className="px-4 pb-3">
+          <button
+            type="button"
+            className="text-xs text-slate-500 hover:text-slate-700"
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            {showDetails ? 'Hide details' : 'View details'}
+          </button>
+          {showDetails && (
+            <div className="mt-2 grid grid-cols-2 gap-4 min-w-0">
+              <div className="min-w-0 break-words whitespace-normal">
+                <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Resume</div>
+                {renderDetails(resumeValue)}
+              </div>
+              <div className="min-w-0 break-words whitespace-normal">
+                <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Job</div>
+                {renderDetails(jobValue)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -1,7 +1,19 @@
 
+const crypto = require('crypto');
 const { extractStructuredFeaturesPair } = require('../services/geminiExtractor');
 const { computeScore } = require('../services/scoreEngine');
 const { explain } = require('../services/geminiExplainer');
+
+const analysisCache = new Map();
+const MAX_CACHE_ENTRIES = 200;
+
+function getCacheKey(resumeText, jobText) {
+  const hash = crypto.createHash('sha256');
+  hash.update(String(resumeText || ''));
+  hash.update('|');
+  hash.update(String(jobText || ''));
+  return hash.digest('hex');
+}
 
 const calculateScore = async (req, res) => {
   try {
@@ -36,28 +48,40 @@ const calculateScoreV2 = async (req, res) => {
       return res.status(400).json({ error: 'Both resumeText and jobText are required.' });
     }
 
+    const cacheKey = getCacheKey(resumeText, jobText);
+    const cached = analysisCache.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
+
+    console.time('analysis');
+
     // 1. extract resume and job features in one call
     const { resumeFeatures, jobFeatures } = await extractStructuredFeaturesPair(resumeText, jobText);
 
     // 3. compute deterministic score
     const { finalScore: score, breakdown } = computeScore(resumeFeatures, jobFeatures);
 
-    console.log('Score calculation complete:');
-    console.log('- Score:', score);
-    console.log('- Breakdown keys:', Object.keys(breakdown).length);
-    console.log('- Matched params:', Object.values(breakdown).filter(p => p.match > 0).length);
+    console.timeEnd('analysis');
 
     // 4. generate explanation
     const explanation = await explain({ score, breakdown, resumeFeatures, jobFeatures });
 
-    return res.status(200).json({
+    const response = {
       score,
       breakdown,
       resumeFeatures,
       jobFeatures,
       reasons: explanation.reasons || [],
       improvements: explanation.improvements || []
-    });
+    };
+
+    if (analysisCache.size >= MAX_CACHE_ENTRIES) {
+      analysisCache.clear();
+    }
+    analysisCache.set(cacheKey, response);
+
+    return res.status(200).json(response);
   } catch (error) {
     console.error('Error in calculateScoreV2:', error);
     
