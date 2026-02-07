@@ -1,5 +1,5 @@
 
-const { extractStructuredFeatures } = require('../services/geminiExtractor');
+const { extractStructuredFeaturesPair } = require('../services/geminiExtractor');
 const { computeScore } = require('../services/scoreEngine');
 const { explain } = require('../services/geminiExplainer');
 
@@ -36,11 +36,8 @@ const calculateScoreV2 = async (req, res) => {
       return res.status(400).json({ error: 'Both resumeText and jobText are required.' });
     }
 
-    // 1. extract resume features
-    const resumeFeatures = await extractStructuredFeatures(resumeText, false);
-
-    // 2. extract job features
-    const jobFeatures = await extractStructuredFeatures(jobText, true);
+    // 1. extract resume and job features in one call
+    const { resumeFeatures, jobFeatures } = await extractStructuredFeaturesPair(resumeText, jobText);
 
     // 3. compute deterministic score
     const { finalScore: score, breakdown } = computeScore(resumeFeatures, jobFeatures);

@@ -1,4 +1,5 @@
-const { matchArrays, matchArraysKeywords } = require('../utils/arrayOverlap');
+const { matchArrays, matchArraysKeywords, matchArraysTokenized } = require('../utils/arrayOverlap');
+const { normalizeTokens } = require('../utils/normalizeTokens');
 const { fuzzyTextMatch } = require('../utils/fuzzyMatch');
 const { areSimilar } = require('../utils/synonymNormalizer');
 
@@ -30,19 +31,24 @@ function matchExperience(candidate, required, label) {
 
 function matchText(resumeValue, jobValue, label) {
   if (!jobValue || !resumeValue) return { match: 0, reason: 'No data provided' };
-  
-  const rTokens = tokenize(resumeValue);
-  const jTokens = tokenize(jobValue);
-  
-  if (rTokens.length === 0 || jTokens.length === 0) return { match: 0, reason: 'No data provided' };
-  
-  const rSet = new Set(rTokens);
-  const overlap = jTokens.filter(t => rSet.has(t)).length;
-  const ratio = overlap / jTokens.length;
-  
-  if (ratio >= 0.5) return { match: 1, reason: 'Strong overlap' };
-  if (ratio >= 0.2 || overlap > 0) return { match: 0.5, reason: 'Partial overlap' };
-  
+
+  const resumeTokens = normalizeTokens([resumeValue]);
+  const jobTokens = normalizeTokens([jobValue]);
+
+  if (resumeTokens.length === 0 || jobTokens.length === 0) return { match: 0, reason: 'No data provided' };
+
+  const resumeNorm = resumeTokens.join(' ');
+  const jobNorm = jobTokens.join(' ');
+
+  if (resumeNorm.includes(jobNorm) || jobNorm.includes(resumeNorm)) {
+    return { match: 1, reason: 'Normalized include' };
+  }
+
+  const resumeSet = new Set(resumeTokens);
+  const overlap = jobTokens.filter(t => resumeSet.has(t)).length;
+
+  if (overlap > 0) return { match: 0.5, reason: 'Token overlap' };
+
   return { match: 0, reason: 'Different field' };
 }
 
@@ -71,11 +77,11 @@ function computeSkillCoverage(resumeFeatures, jobFeatures) {
 function getParameterMatches(resumeFeatures, jobFeatures) {
   const matches = {};
   
-  matches.coreSkills = matchArrays(jobFeatures.coreSkills || [], resumeFeatures.coreSkills || []);
-  matches.secondarySkills = matchArrays(jobFeatures.secondarySkills || [], resumeFeatures.secondarySkills || []);
-  matches.tools = matchArrays(jobFeatures.tools || [], resumeFeatures.tools || []);
-  matches.responsibilities = matchArraysKeywords(jobFeatures.responsibilities || [], resumeFeatures.responsibilities || []);
-  matches.keywords = matchArrays(jobFeatures.keywords || [], resumeFeatures.keywords || []);
+  matches.coreSkills = matchArraysTokenized(jobFeatures.coreSkills || [], resumeFeatures.coreSkills || []);
+  matches.secondarySkills = matchArraysTokenized(jobFeatures.secondarySkills || [], resumeFeatures.secondarySkills || []);
+  matches.tools = matchArraysTokenized(jobFeatures.tools || [], resumeFeatures.tools || []);
+  matches.responsibilities = matchArraysTokenized(jobFeatures.responsibilities || [], resumeFeatures.responsibilities || []);
+  matches.keywords = matchArraysTokenized(jobFeatures.keywords || [], resumeFeatures.keywords || []);
   matches.softSkills = matchArrays(jobFeatures.softSkills || [], resumeFeatures.softSkills || []);
   matches.certifications = matchArrays(jobFeatures.certifications || [], resumeFeatures.certifications || []);
   matches.leadership = matchArrays(jobFeatures.leadership || [], resumeFeatures.leadership || []);
